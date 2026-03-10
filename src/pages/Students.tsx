@@ -1,18 +1,22 @@
 import { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { getStudents } from '@/lib/store';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Search, Phone } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Search, Phone, Eye } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export default function Students() {
+  const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const students = useMemo(() => getStudents(), []);
 
   const filtered = students.filter(s =>
     s.name.toLowerCase().includes(search.toLowerCase()) ||
     s.course.toLowerCase().includes(search.toLowerCase()) ||
-    s.mobile.includes(search)
+    s.mobile.includes(search) ||
+    s.studentId.toLowerCase().includes(search.toLowerCase())
   );
 
   return (
@@ -25,7 +29,7 @@ export default function Students() {
         <div className="relative w-full sm:w-72">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
           <Input
-            placeholder="Search name, course, mobile..."
+            placeholder="Search name, ID, course, mobile..."
             value={search}
             onChange={e => setSearch(e.target.value)}
             className="pl-9"
@@ -38,12 +42,14 @@ export default function Students() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border bg-muted/30">
+                <th className="text-left p-4 font-medium text-muted-foreground">ID</th>
                 <th className="text-left p-4 font-medium text-muted-foreground">Student</th>
                 <th className="text-left p-4 font-medium text-muted-foreground hidden sm:table-cell">Father</th>
                 <th className="text-left p-4 font-medium text-muted-foreground">Course</th>
                 <th className="text-left p-4 font-medium text-muted-foreground hidden md:table-cell">Mobile</th>
                 <th className="text-left p-4 font-medium text-muted-foreground">Fee</th>
                 <th className="text-left p-4 font-medium text-muted-foreground">Status</th>
+                <th className="text-left p-4 font-medium text-muted-foreground"></th>
               </tr>
             </thead>
             <tbody>
@@ -53,8 +59,10 @@ export default function Students() {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   transition={{ delay: i * 0.03 }}
-                  className="border-b border-border last:border-0 hover:bg-muted/50 transition-colors"
+                  className="border-b border-border last:border-0 hover:bg-muted/50 transition-colors cursor-pointer"
+                  onClick={() => navigate(`/admin/student/${s.id}`)}
                 >
+                  <td className="p-4 text-xs text-muted-foreground font-mono">{s.studentId}</td>
                   <td className="p-4">
                     <div className="font-medium text-foreground">{s.name}</div>
                     <div className="text-xs text-muted-foreground mt-0.5">Adm: {new Date(s.admissionDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
@@ -62,7 +70,7 @@ export default function Students() {
                   <td className="p-4 text-muted-foreground hidden sm:table-cell">{s.fatherName}</td>
                   <td className="p-4"><Badge variant="secondary" className="text-xs">{s.course}</Badge></td>
                   <td className="p-4 hidden md:table-cell">
-                    <a href={`tel:${s.mobile}`} className="text-primary flex items-center gap-1 text-xs">
+                    <a href={`tel:${s.mobile}`} className="text-primary flex items-center gap-1 text-xs" onClick={e => e.stopPropagation()}>
                       <Phone size={12} /> {s.mobile}
                     </a>
                   </td>
@@ -71,6 +79,11 @@ export default function Students() {
                     <Badge variant={s.status === 'active' ? 'default' : 'destructive'} className="text-xs">
                       {s.status === 'active' ? 'Active' : 'Stopped'}
                     </Badge>
+                  </td>
+                  <td className="p-4">
+                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={e => { e.stopPropagation(); navigate(`/admin/student/${s.id}`); }}>
+                      <Eye size={14} />
+                    </Button>
                   </td>
                 </motion.tr>
               ))}
