@@ -1,13 +1,13 @@
-import { LayoutDashboard, Users, IndianRupee, ClipboardList, UserPlus, BarChart3 } from 'lucide-react';
+import { LayoutDashboard, Users, IndianRupee, ClipboardList, UserPlus, BarChart3, UserCog, Activity } from 'lucide-react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { getCurrentUser } from '@/lib/auth';
 
 const adminLinks = [
   { to: '/admin', label: 'Home', icon: LayoutDashboard },
   { to: '/admin/students', label: 'Students', icon: Users },
-  { to: '/admin/add-student', label: 'Add', icon: UserPlus },
-  { to: '/admin/fees', label: 'Fees', icon: IndianRupee },
-  { to: '/admin/attendance', label: 'Attend', icon: ClipboardList },
+  { to: '/admin/fee-management', label: 'Fees', icon: IndianRupee },
+  { to: '/admin/student-management', label: 'Manage', icon: UserCog },
+  { to: '/admin/analytics', label: 'Analytics', icon: Activity },
 ];
 
 const studentLinks = [

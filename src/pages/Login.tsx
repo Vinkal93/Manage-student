@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { login } from '@/lib/auth';
+import { loginWithFirebase, login } from '@/lib/auth';
+import { getSettings } from '@/lib/settings';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
@@ -10,16 +11,33 @@ import { Lock, User, GraduationCap, Shield } from 'lucide-react';
 
 export default function Login() {
   const navigate = useNavigate();
+  const settings = getSettings();
   const [mode, setMode] = useState<'admin' | 'student'>('admin');
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
-    setTimeout(() => {
+    try {
+      // Try Firebase login first
+      let user = await loginWithFirebase(identifier, password);
+      
+      // Fallback to local login if Firebase fails
+      if (!user) {
+        user = login(identifier, password);
+      }
+
+      if (user) {
+        toast.success(`Welcome ${user.name}!`);
+        navigate(user.role === 'admin' ? '/admin' : '/student');
+      } else {
+        toast.error('Invalid credentials');
+      }
+    } catch {
+      // Fallback to local login
       const user = login(identifier, password);
       if (user) {
         toast.success(`Welcome ${user.name}!`);
@@ -27,8 +45,8 @@ export default function Login() {
       } else {
         toast.error('Invalid credentials');
       }
-      setLoading(false);
-    }, 500);
+    }
+    setLoading(false);
   };
 
   return (
@@ -42,12 +60,11 @@ export default function Login() {
           <div className="w-16 h-16 rounded-2xl bg-primary flex items-center justify-center mx-auto mb-4">
             <GraduationCap className="text-primary-foreground" size={32} />
           </div>
-          <h1 className="text-2xl font-bold text-foreground">SBCI Computer Institute</h1>
-          <p className="text-muted-foreground text-sm mt-1">Institute Management System</p>
+          <h1 className="text-2xl font-bold text-foreground">{settings.instituteName}</h1>
+          <p className="text-muted-foreground text-sm mt-1">{settings.tagline}</p>
         </div>
 
         <div className="bg-card rounded-xl border border-border shadow-lg p-6 space-y-6">
-          {/* Role toggle */}
           <div className="flex rounded-lg bg-muted p-1 gap-1">
             <button
               onClick={() => { setMode('admin'); setIdentifier(''); setPassword(''); }}
@@ -100,12 +117,12 @@ export default function Login() {
             </Button>
           </form>
 
-          <div className="bg-muted/50 rounded-lg p-3 text-xs text-muted-foreground space-y-1">
-            <p className="font-medium text-foreground text-sm">Demo Credentials:</p>
-            <p><strong>Admin:</strong> admin@sbci.com / admin123</p>
-            <p><strong>Student:</strong> SBCI0001 / sbci123</p>
-          </div>
+          <p className="text-xs text-center text-muted-foreground">
+            Login credentials are provided by the institute administrator
+          </p>
         </div>
+
+        <p className="text-center text-xs text-muted-foreground mt-4">© 2026 {settings.instituteName}</p>
       </motion.div>
     </div>
   );

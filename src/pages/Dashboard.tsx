@@ -1,6 +1,7 @@
 import { Users, IndianRupee, AlertTriangle, UserPlus, ClipboardList, TrendingUp } from 'lucide-react';
 import StatCard from '@/components/StatCard';
 import { getStudents, getDashboardStats } from '@/lib/store';
+import { getSettings } from '@/lib/settings';
 import { useMemo } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -8,6 +9,7 @@ import { useNavigate } from 'react-router-dom';
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const settings = getSettings();
   const students = useMemo(() => getStudents(), []);
   const stats = useMemo(() => getDashboardStats(students), [students]);
 
@@ -18,7 +20,7 @@ export default function Dashboard() {
     <div className="space-y-8">
       <div>
         <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
-        <p className="text-muted-foreground text-sm mt-1">SBCI Computer Institute Overview</p>
+        <p className="text-muted-foreground text-sm mt-1">{settings.instituteName} Overview</p>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
@@ -31,7 +33,6 @@ export default function Dashboard() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Recent Students */}
         <div className="bg-card rounded-xl border border-border shadow-sm">
           <div className="p-5 border-b border-border flex items-center justify-between">
             <h2 className="font-semibold text-foreground">Recent Students</h2>
@@ -52,11 +53,10 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Pending Fees */}
         <div className="bg-card rounded-xl border border-border shadow-sm">
           <div className="p-5 border-b border-border flex items-center justify-between">
             <h2 className="font-semibold text-foreground">⚠️ Pending Fees</h2>
-            <Button variant="ghost" size="sm" className="text-xs" onClick={() => navigate('/admin/fees')}>View All</Button>
+            <Button variant="ghost" size="sm" className="text-xs" onClick={() => navigate('/admin/fee-management')}>View All</Button>
           </div>
           <div className="divide-y divide-border">
             {pendingFeeStudents.map(s => {
