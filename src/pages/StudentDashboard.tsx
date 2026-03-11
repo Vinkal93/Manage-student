@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { getCurrentUser } from '@/lib/auth';
 import { getStudents } from '@/lib/store';
+import { getSettings } from '@/lib/settings';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import StatCard from '@/components/StatCard';
@@ -9,6 +10,7 @@ import { GraduationCap, CreditCard, ClipboardList, MessageSquare, BookOpen } fro
 
 export default function StudentDashboard() {
   const user = getCurrentUser();
+  const settings = getSettings();
   const student = useMemo(() => {
     const students = getStudents();
     return students.find(s => s.id === user?.id || s.studentId === user?.studentId);
@@ -133,9 +135,9 @@ export default function StudentDashboard() {
               </div>
             </div>
             <div className="bg-muted/50 rounded-lg p-4 text-sm text-muted-foreground space-y-1">
-              <p className="font-medium text-foreground">Institute Rules:</p>
-              <p>• Fee must be paid before 10th of every month</p>
-              <p>• Late fee of ₹50 may apply after 10th</p>
+              <p className="font-medium text-foreground">{settings.instituteName} - Rules:</p>
+              <p>• Fee must be paid before {settings.feeDueDate}th of every month</p>
+              <p>• Late fee of ₹{settings.lateFeeAmount} may apply after {settings.feeDueDate}th</p>
               <p>• Minimum 75% attendance required for certificate</p>
               <p>• Classes may be stopped for pending fees beyond 20 days</p>
             </div>

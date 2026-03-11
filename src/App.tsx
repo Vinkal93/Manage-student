@@ -6,17 +6,22 @@ import AppSidebar from "@/components/AppSidebar";
 import MobileNav from "@/components/MobileNav";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { getCurrentUser } from "@/lib/auth";
+import { getSettings } from "@/lib/settings";
 
 // Pages
 import Login from "@/pages/Login";
 import Dashboard from "@/pages/Dashboard";
 import Students from "@/pages/Students";
+import StudentManagement from "@/pages/StudentManagement";
 import AddStudent from "@/pages/AddStudent";
 import FeeTracking from "@/pages/FeeTracking";
+import FeeManagement from "@/pages/FeeManagement";
 import Messages from "@/pages/Messages";
 import BulkMessages from "@/pages/BulkMessages";
 import Attendance from "@/pages/Attendance";
 import Reports from "@/pages/Reports";
+import Analytics from "@/pages/Analytics";
+import Settings from "@/pages/Settings";
 import StudentProfile from "@/pages/StudentProfile";
 import StudentDashboard from "@/pages/StudentDashboard";
 import NotFound from "./pages/NotFound";
@@ -36,11 +41,12 @@ function AdminLayout({ children }: { children: React.ReactNode }) {
 }
 
 function StudentLayout({ children }: { children: React.ReactNode }) {
+  const settings = getSettings();
   return (
     <div className="min-h-screen">
       <header className="bg-primary text-primary-foreground px-4 py-3 flex items-center justify-between">
         <div>
-          <h1 className="text-lg font-bold">SBCI Institute</h1>
+          <h1 className="text-lg font-bold">{settings.instituteName}</h1>
           <p className="text-xs opacity-80">Student Panel</p>
         </div>
         <button
@@ -76,12 +82,16 @@ const App = () => (
           {/* Admin Routes */}
           <Route path="/admin" element={<ProtectedRoute role="admin"><AdminLayout><Dashboard /></AdminLayout></ProtectedRoute>} />
           <Route path="/admin/students" element={<ProtectedRoute role="admin"><AdminLayout><Students /></AdminLayout></ProtectedRoute>} />
+          <Route path="/admin/student-management" element={<ProtectedRoute role="admin"><AdminLayout><StudentManagement /></AdminLayout></ProtectedRoute>} />
           <Route path="/admin/add-student" element={<ProtectedRoute role="admin"><AdminLayout><AddStudent /></AdminLayout></ProtectedRoute>} />
           <Route path="/admin/fees" element={<ProtectedRoute role="admin"><AdminLayout><FeeTracking /></AdminLayout></ProtectedRoute>} />
+          <Route path="/admin/fee-management" element={<ProtectedRoute role="admin"><AdminLayout><FeeManagement /></AdminLayout></ProtectedRoute>} />
           <Route path="/admin/attendance" element={<ProtectedRoute role="admin"><AdminLayout><Attendance /></AdminLayout></ProtectedRoute>} />
           <Route path="/admin/messages" element={<ProtectedRoute role="admin"><AdminLayout><Messages /></AdminLayout></ProtectedRoute>} />
           <Route path="/admin/bulk-messages" element={<ProtectedRoute role="admin"><AdminLayout><BulkMessages /></AdminLayout></ProtectedRoute>} />
           <Route path="/admin/reports" element={<ProtectedRoute role="admin"><AdminLayout><Reports /></AdminLayout></ProtectedRoute>} />
+          <Route path="/admin/analytics" element={<ProtectedRoute role="admin"><AdminLayout><Analytics /></AdminLayout></ProtectedRoute>} />
+          <Route path="/admin/settings" element={<ProtectedRoute role="admin"><AdminLayout><Settings /></AdminLayout></ProtectedRoute>} />
           <Route path="/admin/student/:id" element={<ProtectedRoute role="admin"><AdminLayout><StudentProfile /></AdminLayout></ProtectedRoute>} />
 
           {/* Student Routes */}

@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { addStudent } from '@/lib/store';
+import { createStudentFirebaseAccount } from '@/lib/auth';
+import { getSettings } from '@/lib/settings';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
@@ -8,16 +10,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { toast } from 'sonner';
 import { UserPlus, Copy } from 'lucide-react';
 
-const courses = ['ADCA', 'DCA', 'Tally', 'CCC', 'PGDCA', 'Web Design', 'Python', 'Java'];
-
 export default function AddStudent() {
   const navigate = useNavigate();
+  const settings = getSettings();
   const [form, setForm] = useState({
-    name: '', fatherName: '', mobile: '', whatsappNumber: '', course: '', admissionDate: new Date().toISOString().split('T')[0], feeAmount: 500,
+    name: '', fatherName: '', mobile: '', whatsappNumber: '', course: '', admissionDate: new Date().toISOString().split('T')[0], feeAmount: 500, password: 'sbci123',
   });
   const [newStudent, setNewStudent] = useState<{ studentId: string; name: string } | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.name || !form.fatherName || !form.mobile || !form.course) {
       toast.error('Please fill all fields');
@@ -27,11 +28,15 @@ export default function AddStudent() {
       ...form,
       whatsappNumber: form.whatsappNumber || form.mobile,
     });
+    
+    // Create Firebase account for student
+    await createStudentFirebaseAccount(student.studentId, form.password || 'sbci123');
+    
     setNewStudent({ studentId: student.studentId, name: student.name });
     toast.success(`${form.name} admitted as ${student.studentId}! 🎉`);
   };
 
-  const welcomeMessage = newStudent ? `Dear ${newStudent.name},\n\nWelcome to SBCI Computer Institute.\n\nStudent ID: ${newStudent.studentId}\nCourse: ${form.course}\nPassword: sbci123\n\nPlease keep this ID safe for login.\n\nRegards,\nSBCI Computer Institute` : '';
+  const welcomeMessage = newStudent ? `Dear ${newStudent.name},\n\nWelcome to ${settings.instituteName}.\n\nStudent ID: ${newStudent.studentId}\nCourse: ${form.course}\nPassword: ${form.password}\n\nPlease keep this ID safe for login.\n\nRegards,\n${settings.instituteName}` : '';
 
   if (newStudent) {
     return (
@@ -44,7 +49,7 @@ export default function AddStudent() {
           <div className="bg-muted rounded-lg p-4 text-left space-y-2">
             <p className="text-sm"><strong>Name:</strong> {newStudent.name}</p>
             <p className="text-sm"><strong>Student ID:</strong> <span className="font-mono text-primary">{newStudent.studentId}</span></p>
-            <p className="text-sm"><strong>Password:</strong> sbci123</p>
+            <p className="text-sm"><strong>Password:</strong> {form.password}</p>
           </div>
 
           <div className="bg-muted/50 rounded-lg p-4 text-left">
@@ -58,7 +63,7 @@ export default function AddStudent() {
           </div>
 
           <div className="flex gap-3">
-            <Button variant="outline" className="flex-1" onClick={() => { setNewStudent(null); setForm({ name: '', fatherName: '', mobile: '', whatsappNumber: '', course: '', admissionDate: new Date().toISOString().split('T')[0], feeAmount: 500 }); }}>
+            <Button variant="outline" className="flex-1" onClick={() => { setNewStudent(null); setForm({ name: '', fatherName: '', mobile: '', whatsappNumber: '', course: '', admissionDate: new Date().toISOString().split('T')[0], feeAmount: 500, password: 'sbci123' }); }}>
               Add Another
             </Button>
             <Button className="flex-1" onClick={() => navigate('/admin/students')}>
@@ -101,11 +106,11 @@ export default function AddStudent() {
           <Select value={form.course} onValueChange={v => setForm(f => ({ ...f, course: v }))}>
             <SelectTrigger><SelectValue placeholder="Select course" /></SelectTrigger>
             <SelectContent>
-              {courses.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+              {settings.courses.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-3 gap-4">
           <div className="space-y-2">
             <Label>Admission Date</Label>
             <Input type="date" value={form.admissionDate} onChange={e => setForm(f => ({ ...f, admissionDate: e.target.value }))} />
@@ -113,6 +118,10 @@ export default function AddStudent() {
           <div className="space-y-2">
             <Label>Monthly Fee (₹)</Label>
             <Input type="number" value={form.feeAmount} onChange={e => setForm(f => ({ ...f, feeAmount: Number(e.target.value) }))} />
+          </div>
+          <div className="space-y-2">
+            <Label>Password</Label>
+            <Input value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} placeholder="sbci123" />
           </div>
         </div>
         <Button type="submit" className="w-full gap-2" size="lg">
