@@ -420,7 +420,7 @@ export default function Analytics() {
                   acc[size] = (acc[size] || 0) + 1;
                   return acc;
                 }, {})
-              ).sort((a, b) => b[1] - a[1]).slice(0, 12).map(([size, count]) => (
+              ).sort((a, b) => (b[1] as number) - (a[1] as number)).slice(0, 12).map(([size, count]) => (
                 <div key={size} className="bg-muted/50 rounded-lg p-3 text-center">
                   <p className="text-xs font-mono text-foreground">{size}</p>
                   <p className="text-lg font-bold text-primary">{count as number}</p>
