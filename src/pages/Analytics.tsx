@@ -164,8 +164,8 @@ export default function Analytics() {
     return hours;
   }, [sessions]);
 
-  const allBrowsers = [...new Set(sessions.map((s: any) => parseUserAgent(s.device || '').browser))];
-  const allOS = [...new Set(sessions.map((s: any) => parseUserAgent(s.device || '').os))];
+  const allBrowsers: string[] = [...new Set(sessions.map((s: any) => parseUserAgent(s.device || '').browser))] as string[];
+  const allOS: string[] = [...new Set(sessions.map((s: any) => parseUserAgent(s.device || '').os))] as string[];
 
   const hasFilters = filter !== 'all' || dateFilter !== 'all' || deviceFilter !== 'all' || browserFilter !== 'all' || osFilter !== 'all' || search;
   const clearFilters = () => {
