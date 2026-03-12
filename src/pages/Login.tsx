@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
-import { Lock, User, GraduationCap, Shield } from 'lucide-react';
+import { Lock, User, GraduationCap, Shield, ArrowLeft } from 'lucide-react';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -22,10 +22,7 @@ export default function Login() {
     setLoading(true);
 
     try {
-      // Try Firebase login first
       let user = await loginWithFirebase(identifier, password);
-      
-      // Fallback to local login if Firebase fails
       if (!user) {
         user = login(identifier, password);
       }
@@ -37,7 +34,6 @@ export default function Login() {
         toast.error('Invalid credentials');
       }
     } catch {
-      // Fallback to local login
       const user = login(identifier, password);
       if (user) {
         toast.success(`Welcome ${user.name}!`);
@@ -56,6 +52,10 @@ export default function Login() {
         animate={{ opacity: 1, y: 0 }}
         className="w-full max-w-md"
       >
+        <Button variant="ghost" size="sm" className="mb-4 gap-1 text-muted-foreground" onClick={() => navigate('/')}>
+          <ArrowLeft size={14} /> Back to Home
+        </Button>
+
         <div className="text-center mb-8">
           <div className="w-16 h-16 rounded-2xl bg-primary flex items-center justify-center mx-auto mb-4">
             <GraduationCap className="text-primary-foreground" size={32} />
@@ -122,7 +122,7 @@ export default function Login() {
           </p>
         </div>
 
-        <p className="text-center text-xs text-muted-foreground mt-4">© 2026 {settings.instituteName}</p>
+        <p className="text-center text-xs text-muted-foreground mt-4">© 2026 InSuite Manage</p>
       </motion.div>
     </div>
   );

@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, IndianRupee, MessageSquare, UserPlus, ClipboardList, BarChart3, Send, LogOut, UserCog, Wallet, Activity, Settings } from 'lucide-react';
+import { LayoutDashboard, Users, IndianRupee, MessageSquare, UserPlus, ClipboardList, BarChart3, Send, LogOut, UserCog, Wallet, Activity, Settings, GraduationCap } from 'lucide-react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { logout } from '@/lib/auth';
 import { getSettings } from '@/lib/settings';
@@ -30,9 +30,14 @@ export default function AppSidebar() {
 
   return (
     <aside className="hidden md:flex w-64 flex-col bg-sidebar text-sidebar-foreground min-h-screen border-r border-sidebar-border">
-      <div className="p-6 border-b border-sidebar-border">
-        <h1 className="text-lg font-bold text-sidebar-primary">{settings.instituteShortName}</h1>
-        <p className="text-xs text-sidebar-muted mt-1">Admin Panel</p>
+      <div className="p-5 border-b border-sidebar-border flex items-center gap-3">
+        <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center">
+          <GraduationCap className="text-primary-foreground" size={20} />
+        </div>
+        <div>
+          <h1 className="text-sm font-bold text-sidebar-primary">{settings.instituteShortName}</h1>
+          <p className="text-xs text-sidebar-muted">Admin Panel</p>
+        </div>
       </div>
       <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
         {adminLinks.map(link => {
