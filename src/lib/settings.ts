@@ -15,8 +15,8 @@ export interface InstituteSettings {
 }
 
 const defaultSettings: InstituteSettings = {
-  instituteName: 'SBCI Computer Institute',
-  instituteShortName: 'SBCI',
+  instituteName: 'InSuite Manage',
+  instituteShortName: 'InSuite',
   tagline: 'Institute Management System',
   phone: '',
   email: '',
