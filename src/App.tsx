@@ -11,6 +11,9 @@ import { getSettings } from "@/lib/settings";
 // Pages
 import Landing from "@/pages/Landing";
 import Login from "@/pages/Login";
+import Register from "@/pages/Register";
+import SuperAdmin from "@/pages/SuperAdmin";
+import AboutDeveloper from "@/pages/AboutDeveloper";
 import Dashboard from "@/pages/Dashboard";
 import Students from "@/pages/Students";
 import StudentManagement from "@/pages/StudentManagement";
@@ -79,6 +82,9 @@ const App = () => (
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          <Route path="/su" element={<SuperAdmin />} />
+          <Route path="/about-developer" element={<AboutDeveloper />} />
           <Route path="/dashboard" element={<AuthRedirect />} />
 
           {/* Admin Routes */}

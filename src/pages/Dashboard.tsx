@@ -1,4 +1,4 @@
-import { Users, IndianRupee, AlertTriangle, UserPlus, ClipboardList, TrendingUp } from 'lucide-react';
+import { Users, IndianRupee, AlertTriangle, UserPlus, ClipboardList, TrendingUp, Shield } from 'lucide-react';
 import StatCard from '@/components/StatCard';
 import { getStudents, getDashboardStats } from '@/lib/store';
 import { getSettings } from '@/lib/settings';
@@ -16,11 +16,30 @@ export default function Dashboard() {
   const recentStudents = students.slice(-5).reverse();
   const pendingFeeStudents = students.filter(s => s.feeRecords.some(f => f.status === 'overdue')).slice(0, 5);
 
+  // Plan info
+  const studentCount = students.length;
+  const plan = studentCount <= 15 ? 'Free' : studentCount <= 50 ? 'Basic' : 'Advanced';
+  const planColor = plan === 'Free' ? 'bg-success' : plan === 'Basic' ? 'bg-primary' : 'bg-accent';
+
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
-        <p className="text-muted-foreground text-sm mt-1">{settings.instituteName} Overview</p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
+          <p className="text-muted-foreground text-sm mt-1">{settings.instituteName} Overview</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Badge variant="outline" className="gap-1.5 px-3 py-1.5">
+            <Shield size={12} />
+            Plan: <span className="font-bold">{plan}</span>
+          </Badge>
+          <Badge variant="secondary" className="px-3 py-1.5">
+            {settings.instituteName}
+          </Badge>
+          <Badge variant="outline" className="px-3 py-1.5">
+            Status: <span className="text-success font-bold ml-1">Active</span>
+          </Badge>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
