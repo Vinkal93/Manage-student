@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, IndianRupee, MessageSquare, UserPlus, ClipboardList, BarChart3, Send, LogOut, UserCog, Wallet, Activity, Settings, GraduationCap } from 'lucide-react';
+import { LayoutDashboard, Users, IndianRupee, MessageSquare, UserPlus, ClipboardList, BarChart3, Send, LogOut, UserCog, Wallet, Activity, Settings, GraduationCap, Calendar, FileText, Database } from 'lucide-react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { logout } from '@/lib/auth';
 import { getSettings } from '@/lib/settings';
@@ -10,11 +10,14 @@ const adminLinks = [
   { to: '/admin/add-student', label: 'New Admission', icon: UserPlus },
   { to: '/admin/fees', label: 'Fee Tracking', icon: IndianRupee },
   { to: '/admin/fee-management', label: 'Fee Management', icon: Wallet },
+  { to: '/admin/timetable', label: 'Timetable', icon: Calendar },
+  { to: '/admin/assignments', label: 'Assignments', icon: FileText },
   { to: '/admin/attendance', label: 'Attendance', icon: ClipboardList },
   { to: '/admin/messages', label: 'Messages', icon: MessageSquare },
   { to: '/admin/bulk-messages', label: 'Bulk Messages', icon: Send },
   { to: '/admin/reports', label: 'Reports', icon: BarChart3 },
   { to: '/admin/analytics', label: 'Analytics', icon: Activity },
+  { to: '/admin/backup', label: 'Backup', icon: Database },
   { to: '/admin/settings', label: 'Settings', icon: Settings },
 ];
 
@@ -46,13 +49,13 @@ export default function AppSidebar() {
             <NavLink
               key={link.to}
               to={link.to}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
+              className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
                 isActive
                   ? 'bg-sidebar-accent text-sidebar-accent-foreground'
                   : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground'
               }`}
             >
-              <link.icon size={17} />
+              <link.icon size={16} />
               {link.label}
             </NavLink>
           );

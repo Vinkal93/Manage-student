@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, IndianRupee, ClipboardList, UserPlus, BarChart3, UserCog, Activity } from 'lucide-react';
+import { LayoutDashboard, Users, IndianRupee, ClipboardList, UserCog, Activity, Calendar, FileText } from 'lucide-react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { getCurrentUser } from '@/lib/auth';
 
@@ -6,14 +6,14 @@ const adminLinks = [
   { to: '/admin', label: 'Home', icon: LayoutDashboard },
   { to: '/admin/students', label: 'Students', icon: Users },
   { to: '/admin/fee-management', label: 'Fees', icon: IndianRupee },
-  { to: '/admin/student-management', label: 'Manage', icon: UserCog },
+  { to: '/admin/timetable', label: 'Schedule', icon: Calendar },
   { to: '/admin/analytics', label: 'Analytics', icon: Activity },
 ];
 
 const studentLinks = [
   { to: '/student', label: 'Home', icon: LayoutDashboard },
-  { to: '/student', label: 'Fees', icon: IndianRupee },
-  { to: '/student', label: 'Attend', icon: ClipboardList },
+  { to: '/student/timetable', label: 'Schedule', icon: Calendar },
+  { to: '/student/assignments', label: 'Tasks', icon: FileText },
 ];
 
 export default function MobileNav() {
