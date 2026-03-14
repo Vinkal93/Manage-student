@@ -7,6 +7,9 @@ import MobileNav from "@/components/MobileNav";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { getCurrentUser } from "@/lib/auth";
 import { getSettings } from "@/lib/settings";
+import { initTheme } from "@/lib/theme";
+import ThemeToggle from "@/components/ThemeToggle";
+import LangToggle from "@/components/LangToggle";
 
 // Pages
 import Landing from "@/pages/Landing";
@@ -28,7 +31,16 @@ import Analytics from "@/pages/Analytics";
 import Settings from "@/pages/Settings";
 import StudentProfile from "@/pages/StudentProfile";
 import StudentDashboard from "@/pages/StudentDashboard";
+import Timetable from "@/pages/Timetable";
+import Assignments from "@/pages/Assignments";
+import Backup from "@/pages/Backup";
+import ParentPortal from "@/pages/ParentPortal";
+import StudentTimetable from "@/pages/StudentTimetable";
+import StudentAssignments from "@/pages/StudentAssignments";
 import NotFound from "./pages/NotFound";
+
+// Initialize theme
+initTheme();
 
 const queryClient = new QueryClient();
 
@@ -36,9 +48,15 @@ function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen">
       <AppSidebar />
-      <main className="flex-1 p-4 md:p-8 pb-20 md:pb-8 overflow-auto">
-        {children}
-      </main>
+      <div className="flex-1 flex flex-col">
+        <header className="h-12 border-b border-border bg-card flex items-center justify-end gap-2 px-4">
+          <LangToggle />
+          <ThemeToggle />
+        </header>
+        <main className="flex-1 p-4 md:p-8 pb-20 md:pb-8 overflow-auto">
+          {children}
+        </main>
+      </div>
       <MobileNav />
     </div>
   );
@@ -53,12 +71,15 @@ function StudentLayout({ children }: { children: React.ReactNode }) {
           <h1 className="text-lg font-bold">{settings.instituteName}</h1>
           <p className="text-xs opacity-80">Student Panel</p>
         </div>
-        <button
-          onClick={() => { import('@/lib/auth').then(m => { m.logout(); window.location.href = '/login'; }); }}
-          className="text-xs bg-primary-foreground/10 hover:bg-primary-foreground/20 px-3 py-1.5 rounded-lg transition-colors"
-        >
-          Logout
-        </button>
+        <div className="flex items-center gap-2">
+          <ThemeToggle />
+          <button
+            onClick={() => { import('@/lib/auth').then(m => { m.logout(); window.location.href = '/login'; }); }}
+            className="text-xs bg-primary-foreground/10 hover:bg-primary-foreground/20 px-3 py-1.5 rounded-lg transition-colors"
+          >
+            Logout
+          </button>
+        </div>
       </header>
       <main className="p-4 md:p-8 pb-20 md:pb-8">
         {children}
@@ -85,6 +106,7 @@ const App = () => (
           <Route path="/register" element={<Register />} />
           <Route path="/su" element={<SuperAdmin />} />
           <Route path="/about-developer" element={<AboutDeveloper />} />
+          <Route path="/parent" element={<ParentPortal />} />
           <Route path="/dashboard" element={<AuthRedirect />} />
 
           {/* Admin Routes */}
@@ -100,10 +122,15 @@ const App = () => (
           <Route path="/admin/reports" element={<ProtectedRoute role="admin"><AdminLayout><Reports /></AdminLayout></ProtectedRoute>} />
           <Route path="/admin/analytics" element={<ProtectedRoute role="admin"><AdminLayout><Analytics /></AdminLayout></ProtectedRoute>} />
           <Route path="/admin/settings" element={<ProtectedRoute role="admin"><AdminLayout><Settings /></AdminLayout></ProtectedRoute>} />
+          <Route path="/admin/timetable" element={<ProtectedRoute role="admin"><AdminLayout><Timetable /></AdminLayout></ProtectedRoute>} />
+          <Route path="/admin/assignments" element={<ProtectedRoute role="admin"><AdminLayout><Assignments /></AdminLayout></ProtectedRoute>} />
+          <Route path="/admin/backup" element={<ProtectedRoute role="admin"><AdminLayout><Backup /></AdminLayout></ProtectedRoute>} />
           <Route path="/admin/student/:id" element={<ProtectedRoute role="admin"><AdminLayout><StudentProfile /></AdminLayout></ProtectedRoute>} />
 
           {/* Student Routes */}
           <Route path="/student" element={<ProtectedRoute role="student"><StudentLayout><StudentDashboard /></StudentLayout></ProtectedRoute>} />
+          <Route path="/student/timetable" element={<ProtectedRoute role="student"><StudentLayout><StudentTimetable /></StudentLayout></ProtectedRoute>} />
+          <Route path="/student/assignments" element={<ProtectedRoute role="student"><StudentLayout><StudentAssignments /></StudentLayout></ProtectedRoute>} />
 
           <Route path="*" element={<NotFound />} />
         </Routes>
