@@ -223,7 +223,7 @@ export default function DatabaseSettings() {
                 </Button>
               </div>
               {testResult && (
-                <div className={`p-3 rounded-lg flex items-center gap-2 text-sm ${testResult.success ? 'bg-emerald-500/10 text-emerald-600' : 'bg-destructive/10 text-destructive'}`}>
+                <div className={`p-3 rounded-lg flex items-center gap-2 text-sm ${testResult.success ? 'bg-accent/10 text-accent' : 'bg-destructive/10 text-destructive'}`}>
                   {testResult.success ? <CheckCircle2 size={16} /> : <XCircle size={16} />}
                   {testResult.message}
                 </div>
