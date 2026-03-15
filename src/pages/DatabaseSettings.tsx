@@ -82,9 +82,9 @@ export default function DatabaseSettings() {
 
       {/* Connection Status */}
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-        className={`rounded-xl border p-4 flex items-center justify-between ${config.connected ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-muted/50 border-border'}`}>
+        className={`rounded-xl border p-4 flex items-center justify-between ${config.connected ? 'bg-accent/20 border-accent/40' : 'bg-muted/50 border-border'}`}>
         <div className="flex items-center gap-3">
-          {config.connected ? <CheckCircle2 className="text-emerald-500" size={20} /> : <XCircle className="text-muted-foreground" size={20} />}
+          {config.connected ? <CheckCircle2 className="text-accent" size={20} /> : <XCircle className="text-muted-foreground" size={20} />}
           <div>
             <p className="font-semibold text-foreground">{config.connected ? 'Connected' : 'Not Connected'}</p>
             <p className="text-xs text-muted-foreground">
