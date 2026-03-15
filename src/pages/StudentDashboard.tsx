@@ -1,12 +1,13 @@
 import { useMemo } from 'react';
 import { getCurrentUser } from '@/lib/auth';
 import { getStudents } from '@/lib/store';
+import { getAssignments } from '@/lib/assignments';
 import { getSettings } from '@/lib/settings';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import StatCard from '@/components/StatCard';
 import { motion } from 'framer-motion';
-import { GraduationCap, CreditCard, ClipboardList, MessageSquare, BookOpen } from 'lucide-react';
+import { GraduationCap, CreditCard, ClipboardList, MessageSquare, BookOpen, FileText, Bell } from 'lucide-react';
 
 export default function StudentDashboard() {
   const user = getCurrentUser();
@@ -15,6 +16,28 @@ export default function StudentDashboard() {
     const students = getStudents();
     return students.find(s => s.id === user?.id || s.studentId === user?.studentId);
   }, [user]);
+
+  const assignmentMessages = useMemo(() => {
+    if (!student) return [];
+    const assignments = getAssignments();
+    // Get assignments that target this student's course or are for 'All'
+    return assignments
+      .filter(a => {
+        const cn = a.className.toLowerCase();
+        const sc = student.course.toLowerCase();
+        return cn === 'all' || cn.includes(sc) || cn.includes('all');
+      })
+      .map(a => ({
+        id: a.id,
+        date: a.createdAt,
+        title: a.title,
+        subject: a.subject,
+        deadline: a.deadline,
+        description: a.description,
+        isOverdue: new Date(a.deadline) < new Date(),
+        submitted: a.submissions.some(s => s.studentId === student.studentId),
+      }));
+  }, [student]);
 
   if (!student) {
     return <div className="text-center py-20 text-muted-foreground">Student data not found. Please contact admin.</div>;
@@ -45,13 +68,88 @@ export default function StudentDashboard() {
         <StatCard title="Total Paid" value={`₹${totalPaid.toLocaleString()}`} icon={CreditCard} variant="accent" />
       </div>
 
-      <Tabs defaultValue="fees" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-4">
+      <Tabs defaultValue="messages" className="space-y-4">
+        <TabsList className="grid w-full grid-cols-5">
+          <TabsTrigger value="messages" className="text-xs gap-1"><MessageSquare size={14} /> Messages</TabsTrigger>
+          <TabsTrigger value="assignments" className="text-xs gap-1"><FileText size={14} /> Assignments</TabsTrigger>
           <TabsTrigger value="fees" className="text-xs gap-1"><CreditCard size={14} /> Fees</TabsTrigger>
           <TabsTrigger value="attendance" className="text-xs gap-1"><ClipboardList size={14} /> Attendance</TabsTrigger>
-          <TabsTrigger value="messages" className="text-xs gap-1"><MessageSquare size={14} /> Messages</TabsTrigger>
           <TabsTrigger value="course" className="text-xs gap-1"><BookOpen size={14} /> Course</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="messages">
+          <div className="space-y-3">
+            {/* Assignment Notifications */}
+            {assignmentMessages.length > 0 && (
+              <div className="space-y-2">
+                <h3 className="text-sm font-semibold text-foreground flex items-center gap-2"><Bell size={14} className="text-primary" /> Assignment Notifications</h3>
+                {assignmentMessages.map(am => (
+                  <motion.div key={am.id} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }}
+                    className={`bg-card rounded-xl border p-4 ${am.submitted ? 'border-accent/30' : am.isOverdue ? 'border-destructive/30' : 'border-primary/30'}`}>
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <p className="font-medium text-foreground text-sm">{am.title}</p>
+                        <div className="flex gap-2 mt-1">
+                          <Badge variant="outline" className="text-xs">{am.subject}</Badge>
+                          <Badge variant={am.submitted ? 'default' : am.isOverdue ? 'destructive' : 'secondary'} className="text-xs">
+                            {am.submitted ? '✅ Submitted' : am.isOverdue ? '⏰ Overdue' : `Due: ${am.deadline}`}
+                          </Badge>
+                        </div>
+                        {am.description && <p className="text-xs text-muted-foreground mt-1">{am.description}</p>}
+                      </div>
+                      <span className="text-xs text-muted-foreground">{new Date(am.date).toLocaleDateString('en-IN')}</span>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            )}
+
+            {/* Regular Messages */}
+            <div className="bg-card rounded-xl border border-border shadow-sm divide-y divide-border">
+              <div className="p-3 border-b border-border bg-muted/30">
+                <h3 className="text-sm font-semibold text-foreground">Institute Messages</h3>
+              </div>
+              {student.messageHistory.length === 0 ? (
+                <div className="p-6 text-center text-sm text-muted-foreground">No messages yet</div>
+              ) : (
+                student.messageHistory.map(m => (
+                  <div key={m.id} className="p-4">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Badge variant="outline" className="text-xs capitalize">{m.type}</Badge>
+                      <span className="text-xs text-muted-foreground">{new Date(m.date).toLocaleDateString('en-IN')}</span>
+                    </div>
+                    <p className="text-sm text-foreground">{m.message}</p>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="assignments">
+          <div className="bg-card rounded-xl border border-border shadow-sm divide-y divide-border">
+            {assignmentMessages.length === 0 ? (
+              <div className="p-6 text-center text-sm text-muted-foreground">No assignments assigned to you</div>
+            ) : (
+              assignmentMessages.map(am => (
+                <div key={am.id} className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium text-foreground">{am.title}</p>
+                      <div className="flex gap-2 mt-1">
+                        <Badge variant="outline" className="text-xs">{am.subject}</Badge>
+                        <Badge variant={am.submitted ? 'default' : am.isOverdue ? 'destructive' : 'secondary'} className="text-xs">
+                          {am.submitted ? '✅ Submitted' : am.isOverdue ? '⏰ Overdue' : `Due: ${am.deadline}`}
+                        </Badge>
+                      </div>
+                    </div>
+                    <span className="text-xs text-muted-foreground">{am.date}</span>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </TabsContent>
 
         <TabsContent value="fees">
           <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
@@ -99,40 +197,14 @@ export default function StudentDashboard() {
           </div>
         </TabsContent>
 
-        <TabsContent value="messages">
-          <div className="bg-card rounded-xl border border-border shadow-sm divide-y divide-border">
-            {student.messageHistory.map(m => (
-              <div key={m.id} className="p-4">
-                <div className="flex items-center gap-2 mb-1">
-                  <Badge variant="outline" className="text-xs capitalize">{m.type}</Badge>
-                  <span className="text-xs text-muted-foreground">{new Date(m.date).toLocaleDateString('en-IN')}</span>
-                </div>
-                <p className="text-sm text-foreground">{m.message}</p>
-              </div>
-            ))}
-          </div>
-        </TabsContent>
-
         <TabsContent value="course">
           <div className="bg-card rounded-xl border border-border shadow-sm p-6 space-y-4">
             <h3 className="font-semibold text-foreground">Course Information</h3>
             <div className="grid grid-cols-2 gap-4 text-sm">
-              <div>
-                <p className="text-muted-foreground">Course</p>
-                <p className="font-medium text-foreground">{student.course}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground">Monthly Fee</p>
-                <p className="font-medium text-foreground">₹{student.feeAmount}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground">Duration</p>
-                <p className="font-medium text-foreground">{student.course === 'ADCA' || student.course === 'PGDCA' ? '12 Months' : '6 Months'}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground">Certificate</p>
-                <p className="font-medium text-foreground">On Completion</p>
-              </div>
+              <div><p className="text-muted-foreground">Course</p><p className="font-medium text-foreground">{student.course}</p></div>
+              <div><p className="text-muted-foreground">Monthly Fee</p><p className="font-medium text-foreground">₹{student.feeAmount}</p></div>
+              <div><p className="text-muted-foreground">Duration</p><p className="font-medium text-foreground">{student.course === 'ADCA' || student.course === 'PGDCA' ? '12 Months' : '6 Months'}</p></div>
+              <div><p className="text-muted-foreground">Certificate</p><p className="font-medium text-foreground">On Completion</p></div>
             </div>
             <div className="bg-muted/50 rounded-lg p-4 text-sm text-muted-foreground space-y-1">
               <p className="font-medium text-foreground">{settings.instituteName} - Rules:</p>

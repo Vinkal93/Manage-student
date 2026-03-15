@@ -16,9 +16,29 @@ export default function Login() {
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState<{ identifier?: string; password?: string }>({});
+
+  const validate = (): boolean => {
+    const newErrors: typeof errors = {};
+    if (!identifier.trim()) {
+      newErrors.identifier = mode === 'admin' ? 'Email is required' : 'Student ID is required';
+    } else if (mode === 'admin' && !identifier.includes('@')) {
+      newErrors.identifier = 'Please enter a valid email';
+    } else if (mode === 'student' && identifier.trim().length < 4) {
+      newErrors.identifier = 'Please enter a valid Student ID';
+    }
+    if (!password.trim()) {
+      newErrors.password = 'Password is required';
+    } else if (password.length < 4) {
+      newErrors.password = 'Password must be at least 4 characters';
+    }
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!validate()) return;
     setLoading(true);
 
     try {
@@ -26,7 +46,6 @@ export default function Login() {
       if (!user) {
         user = login(identifier, password);
       }
-
       if (user) {
         toast.success(`Welcome ${user.name}!`);
         navigate(user.role === 'admin' ? '/admin' : '/student');
@@ -47,11 +66,7 @@ export default function Login() {
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <motion.div
-        initial={{ opacity: 0, y: 30 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-md"
-      >
+      <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-md">
         <Button variant="ghost" size="sm" className="mb-4 gap-1 text-muted-foreground" onClick={() => navigate('/')}>
           <ArrowLeft size={14} /> Back to Home
         </Button>
@@ -67,7 +82,7 @@ export default function Login() {
         <div className="bg-card rounded-xl border border-border shadow-lg p-6 space-y-6">
           <div className="flex rounded-lg bg-muted p-1 gap-1">
             <button
-              onClick={() => { setMode('admin'); setIdentifier(''); setPassword(''); }}
+              onClick={() => { setMode('admin'); setIdentifier(''); setPassword(''); setErrors({}); }}
               className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-md text-sm font-medium transition-all ${
                 mode === 'admin' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
               }`}
@@ -75,7 +90,7 @@ export default function Login() {
               <Shield size={16} /> Admin
             </button>
             <button
-              onClick={() => { setMode('student'); setIdentifier(''); setPassword(''); }}
+              onClick={() => { setMode('student'); setIdentifier(''); setPassword(''); setErrors({}); }}
               className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-md text-sm font-medium transition-all ${
                 mode === 'student' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
               }`}
@@ -85,20 +100,20 @@ export default function Login() {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <Label>{mode === 'admin' ? 'Email' : 'Student ID'}</Label>
               <div className="relative">
                 <User className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
                 <Input
                   placeholder={mode === 'admin' ? 'admin@sbci.com' : 'e.g. SBCI0001'}
                   value={identifier}
-                  onChange={e => setIdentifier(e.target.value)}
-                  className="pl-9"
-                  required
+                  onChange={e => { setIdentifier(e.target.value); if (errors.identifier) setErrors(er => ({ ...er, identifier: undefined })); }}
+                  className={`pl-9 ${errors.identifier ? 'border-destructive' : ''}`}
                 />
               </div>
+              {errors.identifier && <p className="text-xs text-destructive">{errors.identifier}</p>}
             </div>
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <Label>Password</Label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
@@ -106,11 +121,11 @@ export default function Login() {
                   type="password"
                   placeholder="Enter password"
                   value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  className="pl-9"
-                  required
+                  onChange={e => { setPassword(e.target.value); if (errors.password) setErrors(er => ({ ...er, password: undefined })); }}
+                  className={`pl-9 ${errors.password ? 'border-destructive' : ''}`}
                 />
               </div>
+              {errors.password && <p className="text-xs text-destructive">{errors.password}</p>}
             </div>
             <Button type="submit" className="w-full" size="lg" disabled={loading}>
               {loading ? 'Logging in...' : 'Login'}
