@@ -126,6 +126,7 @@ const App = () => (
           <Route path="/admin/timetable" element={<ProtectedRoute role="admin"><AdminLayout><Timetable /></AdminLayout></ProtectedRoute>} />
           <Route path="/admin/assignments" element={<ProtectedRoute role="admin"><AdminLayout><Assignments /></AdminLayout></ProtectedRoute>} />
           <Route path="/admin/backup" element={<ProtectedRoute role="admin"><AdminLayout><Backup /></AdminLayout></ProtectedRoute>} />
+          <Route path="/admin/database" element={<ProtectedRoute role="admin"><AdminLayout><DatabaseSettings /></AdminLayout></ProtectedRoute>} />
           <Route path="/admin/student/:id" element={<ProtectedRoute role="admin"><AdminLayout><StudentProfile /></AdminLayout></ProtectedRoute>} />
 
           {/* Student Routes */}
