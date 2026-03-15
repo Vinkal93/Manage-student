@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, IndianRupee, MessageSquare, UserPlus, ClipboardList, BarChart3, Send, LogOut, UserCog, Wallet, Activity, Settings, GraduationCap, Calendar, FileText, Database } from 'lucide-react';
+import { LayoutDashboard, Users, IndianRupee, MessageSquare, UserPlus, ClipboardList, BarChart3, Send, LogOut, UserCog, Wallet, Activity, Settings, GraduationCap, Calendar, FileText, Database, Sheet } from 'lucide-react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { logout } from '@/lib/auth';
 import { getSettings } from '@/lib/settings';
@@ -18,6 +18,7 @@ const adminLinks = [
   { to: '/admin/reports', label: 'Reports', icon: BarChart3 },
   { to: '/admin/analytics', label: 'Analytics', icon: Activity },
   { to: '/admin/backup', label: 'Backup', icon: Database },
+  { to: '/admin/database', label: 'Database', icon: Sheet },
   { to: '/admin/settings', label: 'Settings', icon: Settings },
 ];
 
