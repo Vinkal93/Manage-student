@@ -34,6 +34,7 @@ import StudentDashboard from "@/pages/StudentDashboard";
 import Timetable from "@/pages/Timetable";
 import Assignments from "@/pages/Assignments";
 import Backup from "@/pages/Backup";
+import DatabaseSettings from "@/pages/DatabaseSettings";
 import ParentPortal from "@/pages/ParentPortal";
 import StudentTimetable from "@/pages/StudentTimetable";
 import StudentAssignments from "@/pages/StudentAssignments";
