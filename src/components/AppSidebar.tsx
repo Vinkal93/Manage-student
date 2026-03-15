@@ -18,6 +18,7 @@ const adminLinks = [
   { to: '/admin/reports', label: 'Reports', icon: BarChart3 },
   { to: '/admin/analytics', label: 'Analytics', icon: Activity },
   { to: '/admin/backup', label: 'Backup', icon: Database },
+  { to: '/admin/database', label: 'Database', icon: Sheet },
   { to: '/admin/settings', label: 'Settings', icon: Settings },
 ];
 
