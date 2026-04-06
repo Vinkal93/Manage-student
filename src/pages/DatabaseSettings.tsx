@@ -30,6 +30,7 @@ const DB_ICONS: Record<DatabaseType, React.ReactNode> = {
 };
 
 export default function DatabaseSettings() {
+  const navigate = useNavigate();
   const [config, setConfig] = useState<DatabaseConfig>(getDbConfig());
   const [sheetsConfig, setSheetsConfig] = useState<SheetsConfig>(getSheetsConfig());
   const [testing, setTesting] = useState(false);
