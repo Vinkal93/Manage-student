@@ -262,12 +262,10 @@ export default function DatabaseSettings() {
             <Button variant="outline" onClick={handleSave} className="gap-2">
               <Settings2 size={14} /> Save Config
             </Button>
-            {config.type !== 'local' && (
-              <Button variant="secondary" size="sm" className="gap-1.5"
-                onClick={() => navigate(`/admin/database/guide/${config.type}`)}>
-                <BookOpen size={14} /> How to Connect
-              </Button>
-            )}
+            <Button variant="secondary" size="sm" className="gap-1.5"
+              onClick={() => navigate(`/admin/database/guide/${config.type}`)}>
+              <BookOpen size={14} /> How to Connect
+            </Button>
           </div>
 
           {testResult && (
