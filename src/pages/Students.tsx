@@ -4,7 +4,7 @@ import { getStudents } from '@/lib/store';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Search, Phone, Eye } from 'lucide-react';
+import { Search, Phone, Eye, UserPlus, UserCog } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export default function Students() {

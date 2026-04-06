@@ -10,6 +10,7 @@ import { motion } from 'framer-motion';
 import { Search, Check, Wallet, Plus } from 'lucide-react';
 
 export default function FeeTracking() {
+  const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [refreshKey, setRefreshKey] = useState(0);
