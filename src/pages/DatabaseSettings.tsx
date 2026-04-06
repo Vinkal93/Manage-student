@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { getDbConfig, saveDbConfig, testDbConnection, DB_LABELS, DB_FIELDS, type DatabaseConfig, type DatabaseType } from '@/lib/dbConnectors';
 import { getSheetsConfig, saveSheetsConfig, type SheetsConfig } from '@/lib/sheets';
 import { Input } from '@/components/ui/input';
@@ -12,7 +13,7 @@ import { toast } from 'sonner';
 import { motion } from 'framer-motion';
 import {
   Database, Link, Table2, RefreshCw, CheckCircle2, XCircle, Download,
-  FileSpreadsheet, Settings2, Zap, Clock, Hand, Shield, ExternalLink, Info, Flame, Cloud, Grid3X3, Server, Box, LayoutGrid
+  FileSpreadsheet, Settings2, Zap, Clock, Hand, Shield, ExternalLink, Info, Flame, Cloud, Grid3X3, Server, Box, LayoutGrid, BookOpen
 } from 'lucide-react';
 
 const SUGGESTED_SHEETS = ['Students', 'Fees', 'Attendance', 'Assignments', 'Results', 'Reports', 'Logs'];
@@ -29,6 +30,7 @@ const DB_ICONS: Record<DatabaseType, React.ReactNode> = {
 };
 
 export default function DatabaseSettings() {
+  const navigate = useNavigate();
   const [config, setConfig] = useState<DatabaseConfig>(getDbConfig());
   const [sheetsConfig, setSheetsConfig] = useState<SheetsConfig>(getSheetsConfig());
   const [testing, setTesting] = useState(false);
@@ -252,13 +254,17 @@ export default function DatabaseSettings() {
             ))}
           </div>
 
-          <div className="flex gap-2 pt-2">
+          <div className="flex gap-2 pt-2 flex-wrap">
             <Button onClick={handleTest} disabled={testing} className="gap-2">
               {testing ? <RefreshCw size={14} className="animate-spin" /> : <Zap size={14} />}
               {testing ? 'Testing...' : 'Test Connection'}
             </Button>
             <Button variant="outline" onClick={handleSave} className="gap-2">
               <Settings2 size={14} /> Save Config
+            </Button>
+            <Button variant="secondary" size="sm" className="gap-1.5"
+              onClick={() => navigate(`/admin/database/guide/${config.type}`)}>
+              <BookOpen size={14} /> How to Connect
             </Button>
           </div>
 

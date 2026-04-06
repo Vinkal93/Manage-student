@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { getStudents, markFeePaid } from '@/lib/store';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -6,9 +7,10 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
-import { Search, Check } from 'lucide-react';
+import { Search, Check, Wallet, Plus } from 'lucide-react';
 
 export default function FeeTracking() {
+  const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [refreshKey, setRefreshKey] = useState(0);
@@ -32,9 +34,19 @@ export default function FeeTracking() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Fee Tracking</h1>
-        <p className="text-muted-foreground text-sm mt-1">Track and manage all fee payments</p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Fee Tracking</h1>
+          <p className="text-muted-foreground text-sm mt-1">Track and manage all fee payments</p>
+        </div>
+        <div className="flex gap-2 flex-wrap">
+          <Button onClick={() => navigate('/admin/fee-management')} variant="outline" className="gap-1.5 text-xs" size="sm">
+            <Wallet size={14} /> Fee Management
+          </Button>
+          <Button onClick={() => navigate('/admin/fee-record')} className="gap-1.5 text-xs" size="sm">
+            <Plus size={14} /> Fee Record
+          </Button>
+        </div>
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3">
