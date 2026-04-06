@@ -26,15 +26,23 @@ export default function Students() {
           <h1 className="text-2xl font-bold text-foreground">Students</h1>
           <p className="text-muted-foreground text-sm mt-1">{students.length} total students</p>
         </div>
-        <div className="relative w-full sm:w-72">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
-          <Input
-            placeholder="Search name, ID, course, mobile..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="pl-9"
-          />
+        <div className="flex gap-2 flex-wrap">
+          <Button onClick={() => navigate('/admin/add-student')} className="gap-1.5 text-xs" size="sm">
+            <UserPlus size={14} /> Add Student
+          </Button>
+          <Button variant="outline" onClick={() => navigate('/admin/student-management')} className="gap-1.5 text-xs" size="sm">
+            <UserCog size={14} /> Manage Students
+          </Button>
         </div>
+      </div>
+      <div className="relative w-full sm:w-72">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
+        <Input
+          placeholder="Search name, ID, course, mobile..."
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          className="pl-9"
+        />
       </div>
 
       <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
