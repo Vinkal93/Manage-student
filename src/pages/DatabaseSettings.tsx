@@ -254,7 +254,7 @@ export default function DatabaseSettings() {
             ))}
           </div>
 
-          <div className="flex gap-2 pt-2">
+          <div className="flex gap-2 pt-2 flex-wrap">
             <Button onClick={handleTest} disabled={testing} className="gap-2">
               {testing ? <RefreshCw size={14} className="animate-spin" /> : <Zap size={14} />}
               {testing ? 'Testing...' : 'Test Connection'}
@@ -262,6 +262,12 @@ export default function DatabaseSettings() {
             <Button variant="outline" onClick={handleSave} className="gap-2">
               <Settings2 size={14} /> Save Config
             </Button>
+            {config.type !== 'local' && (
+              <Button variant="secondary" size="sm" className="gap-1.5"
+                onClick={() => navigate(`/admin/database/guide/${config.type}`)}>
+                <BookOpen size={14} /> How to Connect
+              </Button>
+            )}
           </div>
 
           {testResult && (
