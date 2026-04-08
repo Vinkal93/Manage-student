@@ -56,7 +56,7 @@ function AdminLayout({ children }: { children: React.ReactNode }) {
           <LangToggle />
           <ThemeToggle />
         </header>
-        <main className="flex-1 p-4 md:p-8 pb-20 md:pb-8 overflow-auto">
+        <main className="flex-1 p-4 md:p-8 pt-16 md:pt-4 pb-4 overflow-auto">
           {children}
         </main>
       </div>
@@ -84,7 +84,7 @@ function StudentLayout({ children }: { children: React.ReactNode }) {
           </button>
         </div>
       </header>
-      <main className="p-4 md:p-8 pb-20 md:pb-8">
+      <main className="p-4 md:p-8 pt-16 md:pt-4 pb-4">
         {children}
       </main>
       <MobileNav />
