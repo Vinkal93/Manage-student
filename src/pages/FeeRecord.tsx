@@ -4,11 +4,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
 import { Search, IndianRupee, Calendar, CreditCard, StickyNote, CheckCircle2, User } from 'lucide-react';
+import { generateFeeMessage } from '@/lib/whatsapp';
+import WhatsAppConfirmDialog from '@/components/WhatsAppConfirmDialog';
 
 export default function FeeRecord() {
   const [search, setSearch] = useState('');
@@ -20,6 +21,8 @@ export default function FeeRecord() {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [showWhatsApp, setShowWhatsApp] = useState(false);
+  const [lastPayment, setLastPayment] = useState<{ studentName: string; course: string; amount: number; month: string; phone: string; receiptNo: string } | null>(null);
 
   const students = useMemo(() => getStudents(), [refreshKey]);
 
@@ -39,10 +42,7 @@ export default function FeeRecord() {
   const recentRecords = useMemo(() => {
     return students.flatMap(s =>
       s.feeRecords.filter(f => f.status === 'paid').map(f => ({
-        ...f,
-        studentName: s.name,
-        studentCode: s.studentId,
-        course: s.course,
+        ...f, studentName: s.name, studentCode: s.studentId, course: s.course,
       }))
     ).sort((a, b) => new Date(b.paidDate || '').getTime() - new Date(a.paidDate || '').getTime()).slice(0, 10);
   }, [students]);
@@ -51,6 +51,7 @@ export default function FeeRecord() {
     const e: Record<string, string> = {};
     if (!selectedStudentId) e.student = 'Please select a student';
     if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) e.amount = 'Enter valid amount';
+    if (Number(amount) > 500000) e.amount = 'Amount seems too high';
     if (!date) e.date = 'Select date';
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -62,40 +63,61 @@ export default function FeeRecord() {
     const student = all.find(s => s.id === selectedStudentId);
     if (!student) return;
 
-    const monthName = new Date(date).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' });
+    const monthName = new Date(date).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+    const receiptNo = `RCP-${Date.now().toString(36).toUpperCase()}`;
 
     student.feeRecords.push({
-      id: crypto.randomUUID(),
-      month: monthName,
-      dueDate: date,
-      paidDate: date,
-      amount: Number(amount),
-      lateFee: 0,
-      status: 'paid',
-      paymentMode,
+      id: crypto.randomUUID(), month: monthName, dueDate: date, paidDate: date,
+      amount: Number(amount), lateFee: 0, status: 'paid', paymentMode,
     });
 
     if (note.trim()) {
       student.messageHistory.push({
-        id: crypto.randomUUID(),
-        date: new Date().toISOString().split('T')[0],
-        type: 'bulk',
-        message: `💰 Fee Payment: ₹${amount} received via ${paymentMode}. ${note}`,
-        status: 'sent',
+        id: crypto.randomUUID(), date: new Date().toISOString().split('T')[0],
+        type: 'bulk', message: `💰 Fee Payment: ₹${amount} received via ${paymentMode}. ${note}`, status: 'sent',
       });
     }
 
     saveStudents(all);
+
+    setLastPayment({
+      studentName: student.name, course: student.course,
+      amount: Number(amount), month: monthName,
+      phone: student.whatsappNumber || student.mobile,
+      receiptNo,
+    });
+    setShowWhatsApp(true);
+
     toast.success(`₹${amount} fee recorded for ${student.name}`);
-    setSelectedStudentId('');
-    setAmount('');
-    setNote('');
-    setSearch('');
+    setSelectedStudentId(''); setAmount(''); setNote(''); setSearch('');
     setRefreshKey(k => k + 1);
   };
 
   return (
     <div className="space-y-6 max-w-4xl">
+      {lastPayment && (
+        <WhatsAppConfirmDialog
+          open={showWhatsApp}
+          onClose={() => setShowWhatsApp(false)}
+          title="Fee Entry Saved Successfully! ✅"
+          subtitle="क्या आप student को WhatsApp पर payment confirmation भेजना चाहते हैं?"
+          phoneNumber={lastPayment.phone}
+          message={generateFeeMessage({
+            studentName: lastPayment.studentName,
+            course: lastPayment.course,
+            amount: lastPayment.amount,
+            date, paymentMode, month: lastPayment.month,
+            receiptNo: lastPayment.receiptNo,
+          })}
+          details={[
+            { label: 'Student', value: lastPayment.studentName },
+            { label: 'Amount', value: `₹${lastPayment.amount.toLocaleString()}` },
+            { label: 'Month', value: lastPayment.month },
+            { label: 'Receipt', value: lastPayment.receiptNo },
+          ]}
+        />
+      )}
+
       <div>
         <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
           <IndianRupee size={24} /> Fee Record
@@ -104,10 +126,9 @@ export default function FeeRecord() {
       </div>
 
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-        className="bg-card rounded-xl border border-border shadow-sm p-6 space-y-5">
+        className="bg-card rounded-xl border border-border shadow-sm p-4 sm:p-6 space-y-5">
         <h3 className="font-semibold text-foreground">New Fee Entry</h3>
 
-        {/* Student Search Dropdown */}
         <div className="space-y-1.5 relative">
           <Label className="flex items-center gap-1.5"><User size={14} /> Student Name</Label>
           <div className="relative">
@@ -116,9 +137,7 @@ export default function FeeRecord() {
               placeholder="Type to search student..."
               value={selectedStudent ? `${selectedStudent.name} (${selectedStudent.studentId})` : search}
               onChange={e => {
-                setSearch(e.target.value);
-                setSelectedStudentId('');
-                setDropdownOpen(true);
+                setSearch(e.target.value); setSelectedStudentId(''); setDropdownOpen(true);
                 if (errors.student) setErrors(er => { const n = { ...er }; delete n.student; return n; });
               }}
               onFocus={() => setDropdownOpen(true)}
@@ -150,7 +169,7 @@ export default function FeeRecord() {
         </div>
 
         {selectedStudent && (
-          <div className="bg-muted/50 rounded-lg p-3 flex items-center justify-between text-sm">
+          <div className="bg-muted/50 rounded-lg p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-sm">
             <div>
               <span className="font-medium">{selectedStudent.name}</span>
               <span className="text-muted-foreground ml-2">({selectedStudent.studentId})</span>
@@ -176,7 +195,7 @@ export default function FeeRecord() {
 
         <div className="space-y-1.5">
           <Label className="flex items-center gap-1.5"><CreditCard size={14} /> Payment Mode</Label>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             {(['cash', 'upi', 'online'] as const).map(mode => (
               <button key={mode} onClick={() => setPaymentMode(mode)}
                 className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors capitalize ${paymentMode === mode ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-muted/80'}`}>
@@ -197,7 +216,6 @@ export default function FeeRecord() {
         </Button>
       </motion.div>
 
-      {/* Recent Records */}
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
         className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
         <div className="p-4 border-b border-border">

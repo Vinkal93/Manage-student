@@ -11,6 +11,7 @@ const adminLinks = [
   { to: '/admin/add-student', label: 'New Admission', icon: UserPlus },
   { to: '/admin/fees', label: 'Fee Tracking', icon: IndianRupee },
   { to: '/admin/fee-management', label: 'Fee Management', icon: Wallet },
+  { to: '/admin/fee-record', label: 'Fee Record', icon: IndianRupee },
   { to: '/admin/timetable', label: 'Timetable', icon: Calendar },
   { to: '/admin/assignments', label: 'Assignments', icon: FileText },
   { to: '/admin/attendance', label: 'Attendance', icon: ClipboardList },

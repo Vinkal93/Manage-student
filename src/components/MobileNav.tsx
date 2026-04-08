@@ -12,6 +12,7 @@ const adminLinks = [
   { to: '/admin/add-student', label: 'New Admission', icon: UserPlus },
   { to: '/admin/fees', label: 'Fee Tracking', icon: IndianRupee },
   { to: '/admin/fee-management', label: 'Fee Management', icon: Wallet },
+  { to: '/admin/fee-record', label: 'Fee Record', icon: IndianRupee },
   { to: '/admin/timetable', label: 'Timetable', icon: Calendar },
   { to: '/admin/assignments', label: 'Assignments', icon: FileText },
   { to: '/admin/attendance', label: 'Attendance', icon: ClipboardList },
@@ -19,6 +20,7 @@ const adminLinks = [
   { to: '/admin/bulk-messages', label: 'Bulk Messages', icon: Send },
   { to: '/admin/reports', label: 'Reports', icon: BarChart3 },
   { to: '/admin/analytics', label: 'Analytics', icon: Activity },
+  { to: '/admin/backup', label: 'Backup', icon: Database },
   { to: '/admin/database', label: 'Database', icon: Sheet },
   { to: '/admin/settings', label: 'Settings', icon: Settings },
 ];
@@ -27,19 +29,6 @@ const studentLinks = [
   { to: '/student', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/student/timetable', label: 'Timetable', icon: Calendar },
   { to: '/student/assignments', label: 'Assignments', icon: FileText },
-];
-
-const bottomQuickLinks = [
-  { to: '/admin', label: 'Home', icon: LayoutDashboard },
-  { to: '/admin/students', label: 'Students', icon: Users },
-  { to: '/admin/fees', label: 'Fees', icon: IndianRupee },
-  { to: '/admin/analytics', label: 'Analytics', icon: Activity },
-];
-
-const studentQuickLinks = [
-  { to: '/student', label: 'Home', icon: LayoutDashboard },
-  { to: '/student/timetable', label: 'Schedule', icon: Calendar },
-  { to: '/student/assignments', label: 'Tasks', icon: FileText },
 ];
 
 export default function MobileNav() {
@@ -51,7 +40,6 @@ export default function MobileNav() {
 
   const isAdmin = user?.role === 'admin';
   const links = isAdmin ? adminLinks : studentLinks;
-  const quickLinks = isAdmin ? bottomQuickLinks : studentQuickLinks;
 
   const handleLogout = () => {
     logout();
@@ -61,25 +49,21 @@ export default function MobileNav() {
 
   return (
     <>
-      {/* Bottom Quick Navigation */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-card border-t border-border z-40">
-        <div className="flex justify-around items-center py-2">
-          <button onClick={() => setOpen(true)} className="flex flex-col items-center gap-1 px-2 py-1 text-xs text-muted-foreground">
-            <Menu size={18} />
-            <span>Menu</span>
+      {/* Top Header Bar with Hamburger - Mobile Only */}
+      <header className="md:hidden fixed top-0 left-0 right-0 bg-card border-b border-border z-40 h-12 flex items-center justify-between px-4">
+        <div className="flex items-center gap-2">
+          <button onClick={() => setOpen(true)} className="p-1.5 rounded-lg hover:bg-muted transition-colors">
+            <Menu size={20} className="text-foreground" />
           </button>
-          {quickLinks.map(link => {
-            const isActive = location.pathname === link.to;
-            return (
-              <NavLink key={link.to} to={link.to}
-                className={`flex flex-col items-center gap-1 px-2 py-1 text-xs transition-colors ${isActive ? 'text-primary font-semibold' : 'text-muted-foreground'}`}>
-                <link.icon size={18} />
-                {link.label}
-              </NavLink>
-            );
-          })}
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center">
+              <GraduationCap className="text-primary-foreground" size={14} />
+            </div>
+            <span className="text-sm font-bold text-foreground truncate max-w-[140px]">{settings.instituteShortName}</span>
+          </div>
         </div>
-      </nav>
+        <span className="text-xs text-muted-foreground">{isAdmin ? 'Admin' : 'Student'}</span>
+      </header>
 
       {/* Slide-out Sidebar Drawer */}
       <AnimatePresence>
@@ -99,7 +83,6 @@ export default function MobileNav() {
               transition={{ type: 'spring', damping: 28, stiffness: 300 }}
               className="fixed left-0 top-0 bottom-0 w-72 bg-sidebar text-sidebar-foreground z-50 shadow-2xl flex flex-col md:hidden"
             >
-              {/* Header */}
               <div className="p-4 border-b border-sidebar-border flex items-center gap-3">
                 <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center shrink-0">
                   <GraduationCap className="text-primary-foreground" size={20} />
@@ -113,7 +96,6 @@ export default function MobileNav() {
                 </button>
               </div>
 
-              {/* Links */}
               <nav className="flex-1 p-2 space-y-0.5 overflow-y-auto">
                 {links.map(link => {
                   const isActive = location.pathname === link.to || (link.to !== '/admin' && link.to !== '/student' && location.pathname.startsWith(link.to));
@@ -131,7 +113,6 @@ export default function MobileNav() {
                 })}
               </nav>
 
-              {/* Footer */}
               <div className="p-3 border-t border-sidebar-border space-y-2">
                 <button onClick={handleLogout}
                   className="flex items-center gap-2 text-sm text-sidebar-foreground/70 hover:text-sidebar-accent-foreground transition-colors w-full px-3 py-2 rounded-lg hover:bg-sidebar-accent/50">
