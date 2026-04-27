@@ -1,0 +1,40 @@
+{
+  "rules": {
+    "students": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "settings": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "admins": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "sessions": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "fcmTokens": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "timetable": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "assignments": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "features": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "meta": {
+      ".read": true,
+      ".write": "auth != null"
+    }
+  }
+}

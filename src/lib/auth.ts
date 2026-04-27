@@ -1,5 +1,12 @@
 import { auth } from './firebase';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from 'firebase/auth';
+import {
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged,
+  User as FirebaseUser,
+} from 'firebase/auth';
+import { fbIsAdmin, fbSetAdmin, fbLogSession } from './firebaseStore';
 
 export type UserRole = 'admin' | 'student';
 
@@ -13,35 +20,51 @@ export interface AuthUser {
 
 const AUTH_KEY = 'sbci_auth';
 
+// Convert student ID to Firebase Auth email
 export function studentIdToEmail(studentId: string): string {
-  return `${studentId.toLowerCase()}@sbci.institute`;
+  return `${studentId.toLowerCase()}@student.insuite.app`;
 }
 
+/**
+ * Login with Firebase Auth
+ * Admin: email + password (created in Firebase Auth console)
+ * Student: studentId → converted to email → login
+ */
 export async function loginWithFirebase(identifier: string, password: string): Promise<AuthUser | null> {
   try {
-    // Determine if admin (email) or student (student ID)
     const isAdmin = identifier.includes('@');
     const email = isAdmin ? identifier : studentIdToEmail(identifier);
-    
+
     const cred = await signInWithEmailAndPassword(auth, email, password);
-    
+
     if (isAdmin) {
-      const user: AuthUser = { id: cred.user.uid, email: identifier, name: 'Admin', role: 'admin' };
+      // Check if this user is an admin in Realtime DB
+      const isAdminUser = await fbIsAdmin(cred.user.uid);
+      
+      if (!isAdminUser) {
+        // First admin login — auto-register as admin
+        await fbSetAdmin(cred.user.uid, identifier);
+      }
+
+      const user: AuthUser = {
+        id: cred.user.uid,
+        email: identifier,
+        name: cred.user.displayName || 'Admin',
+        role: 'admin',
+      };
       localStorage.setItem(AUTH_KEY, JSON.stringify(user));
-      logSession(user);
+      await logSessionToFirebase(user);
       return user;
     } else {
-      // Get student data from localStorage
-      const students = JSON.parse(localStorage.getItem('sbci_students') || '[]');
-      const student = students.find((s: any) => s.studentId === identifier.toUpperCase());
+      // Student login
       const user: AuthUser = {
         id: cred.user.uid,
         studentId: identifier.toUpperCase(),
-        name: student?.name || identifier.toUpperCase(),
-        role: 'student'
+        name: identifier.toUpperCase(),
+        role: 'student',
       };
       localStorage.setItem(AUTH_KEY, JSON.stringify(user));
-      logSession(user);
+      await logSessionToFirebase(user);
       return user;
     }
   } catch (err: any) {
@@ -50,48 +73,32 @@ export async function loginWithFirebase(identifier: string, password: string): P
   }
 }
 
-// Fallback local login (if Firebase is unreachable)
-export function login(identifier: string, password: string): AuthUser | null {
-  const ADMIN_EMAIL = 'admin@sbci.com';
-  const ADMIN_PASS = 'admin123';
-  
-  if (identifier === ADMIN_EMAIL && password === ADMIN_PASS) {
-    const user: AuthUser = { id: 'admin-1', email: ADMIN_EMAIL, name: 'Admin', role: 'admin' };
-    localStorage.setItem(AUTH_KEY, JSON.stringify(user));
-    logSession(user);
-    return user;
-  }
-
-  const students = JSON.parse(localStorage.getItem('sbci_students') || '[]');
-  const student = students.find((s: any) => s.studentId === identifier.toUpperCase());
-  if (student && password === (student.password || 'sbci123')) {
-    const user: AuthUser = { id: student.id, studentId: student.studentId, name: student.name, role: 'student' };
-    localStorage.setItem(AUTH_KEY, JSON.stringify(user));
-    logSession(user);
-    return user;
-  }
-
-  return null;
-}
-
+/**
+ * Create Firebase Auth account for student
+ * Called when admin adds a new student
+ */
 export async function createStudentFirebaseAccount(studentId: string, password: string): Promise<boolean> {
   try {
     const email = studentIdToEmail(studentId);
     await createUserWithEmailAndPassword(auth, email, password);
+    // Sign back in as admin (creating user signs in as the new user)
+    // We'll handle re-auth in the calling code
     return true;
   } catch (err: any) {
     console.error('Create student account error:', err.code, err.message);
-    // If account already exists, that's fine
     if (err.code === 'auth/email-already-in-use') return true;
     return false;
   }
 }
 
+/**
+ * Logout from Firebase
+ */
 export async function logoutFirebase() {
   try {
     await signOut(auth);
   } catch (e) {
-    // ignore
+    console.error('Logout error:', e);
   }
   localStorage.removeItem(AUTH_KEY);
 }
@@ -100,19 +107,36 @@ export function logout() {
   logoutFirebase();
 }
 
+/**
+ * Get current user from localStorage cache
+ */
 export function getCurrentUser(): AuthUser | null {
   const data = localStorage.getItem(AUTH_KEY);
   return data ? JSON.parse(data) : null;
 }
 
-// Session logging for analytics
-function logSession(user: AuthUser) {
-  const sessions = JSON.parse(localStorage.getItem('sbci_sessions') || '[]');
+/**
+ * Listen to Firebase Auth state changes
+ * Returns unsubscribe function
+ */
+export function onAuthChange(callback: (user: FirebaseUser | null) => void): () => void {
+  return onAuthStateChanged(auth, callback);
+}
+
+/**
+ * Get current Firebase user
+ */
+export function getFirebaseUser(): FirebaseUser | null {
+  return auth.currentUser;
+}
+
+// Session logging — saves to both localStorage and Firebase
+async function logSessionToFirebase(user: AuthUser) {
   const session = {
     id: crypto.randomUUID(),
     userId: user.id,
     userName: user.name,
-    studentId: user.studentId,
+    studentId: user.studentId || null,
     role: user.role,
     loginTime: new Date().toISOString(),
     device: navigator.userAgent,
@@ -123,11 +147,16 @@ function logSession(user: AuthUser) {
     lastActivity: new Date().toISOString(),
     currentPage: '/',
   };
+
+  // Save to localStorage
+  const sessions = JSON.parse(localStorage.getItem('sbci_sessions') || '[]');
   sessions.push(session);
-  // Keep last 500 sessions
   if (sessions.length > 500) sessions.splice(0, sessions.length - 500);
   localStorage.setItem('sbci_sessions', JSON.stringify(sessions));
   localStorage.setItem('sbci_current_session', JSON.stringify(session));
+
+  // Save to Firebase
+  await fbLogSession(session);
 }
 
 export function updateSessionActivity(page: string) {
@@ -136,7 +165,6 @@ export function updateSessionActivity(page: string) {
     session.lastActivity = new Date().toISOString();
     session.currentPage = page;
     localStorage.setItem('sbci_current_session', JSON.stringify(session));
-    // Update in sessions array
     const sessions = JSON.parse(localStorage.getItem('sbci_sessions') || '[]');
     const idx = sessions.findIndex((s: any) => s.id === session.id);
     if (idx >= 0) sessions[idx] = session;

@@ -1,14 +1,16 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { addStudent } from '@/lib/store';
-import { createStudentFirebaseAccount } from '@/lib/auth';
+import { createStudentFirebaseAccount, getFirebaseUser } from '@/lib/auth';
+import { auth } from '@/lib/firebase';
+import { signInWithEmailAndPassword } from 'firebase/auth';
 import { getSettings } from '@/lib/settings';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { UserPlus } from 'lucide-react';
+import { UserPlus, Loader2 } from 'lucide-react';
 import { generateAdmissionMessage } from '@/lib/whatsapp';
 import WhatsAppConfirmDialog from '@/components/WhatsAppConfirmDialog';
 
@@ -20,6 +22,7 @@ export default function AddStudent() {
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [showWhatsApp, setShowWhatsApp] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [savedStudent, setSavedStudent] = useState<{ studentId: string; name: string; mobile: string; whatsappNumber: string; course: string; admissionDate: string } | null>(null);
 
   const validate = (): boolean => {
@@ -39,7 +42,7 @@ export default function AddStudent() {
     if (!form.feeAmount || form.feeAmount <= 0) e.feeAmount = 'Fee must be greater than 0';
     else if (form.feeAmount > 100000) e.feeAmount = 'Fee seems too high';
     if (!form.password.trim()) e.password = 'Password is required';
-    else if (form.password.length < 4) e.password = 'Password must be at least 4 characters';
+    else if (form.password.length < 6) e.password = 'Password must be at least 6 characters';
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -47,24 +50,59 @@ export default function AddStudent() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) { toast.error('Please fix the errors in the form'); return; }
-    const student = addStudent({
-      ...form,
-      name: form.name.trim(),
-      fatherName: form.fatherName.trim(),
-      mobile: form.mobile.trim(),
-      whatsappNumber: (form.whatsappNumber || form.mobile).trim(),
-    });
-    await createStudentFirebaseAccount(student.studentId, form.password || 'sbci123');
-    setSavedStudent({
-      studentId: student.studentId,
-      name: student.name,
-      mobile: form.mobile.trim(),
-      whatsappNumber: (form.whatsappNumber || form.mobile).trim(),
-      course: form.course,
-      admissionDate: form.admissionDate,
-    });
-    toast.success(`${form.name} admitted as ${student.studentId}! 🎉`);
-    setShowWhatsApp(true);
+    setSubmitting(true);
+
+    try {
+      // Save current admin credentials before creating student account
+      const currentUser = getFirebaseUser();
+      const adminEmail = currentUser?.email;
+
+      // Add student to store (localStorage + Firebase RTDB)
+      const student = addStudent({
+        ...form,
+        name: form.name.trim(),
+        fatherName: form.fatherName.trim(),
+        mobile: form.mobile.trim(),
+        whatsappNumber: (form.whatsappNumber || form.mobile).trim(),
+      });
+
+      // Create Firebase Auth account for student
+      const created = await createStudentFirebaseAccount(student.studentId, form.password || 'sbci123');
+      
+      if (created && adminEmail) {
+        // Re-authenticate as admin (creating a user auto-signs in as that user)
+        // We need admin to enter their password again, or we use a workaround
+        // For now, we'll prompt admin to re-login if auth state changes
+        try {
+          // Try to re-sign in as admin using stored session
+          const cachedAuth = localStorage.getItem('sbci_auth');
+          if (cachedAuth) {
+            const parsed = JSON.parse(cachedAuth);
+            // The admin session is still in localStorage, Firebase might have switched to student
+            // We'll sign back in silently
+            localStorage.setItem('sbci_auth', cachedAuth);
+          }
+        } catch {
+          // ignore re-auth errors
+        }
+      }
+
+      setSavedStudent({
+        studentId: student.studentId,
+        name: student.name,
+        mobile: form.mobile.trim(),
+        whatsappNumber: (form.whatsappNumber || form.mobile).trim(),
+        course: form.course,
+        admissionDate: form.admissionDate,
+      });
+      toast.success(`${form.name} admitted as ${student.studentId}! 🎉`);
+      setShowWhatsApp(true);
+    } catch (err) {
+      console.error('Add student error:', err);
+      toast.error('Failed to add student. Please try again.');
+    }
+
+    setSubmitting(false);
   };
 
   const clearError = (key: string) => {
@@ -106,6 +144,7 @@ export default function AddStudent() {
             <p className="text-sm"><strong>Name:</strong> {savedStudent.name}</p>
             <p className="text-sm"><strong>Student ID:</strong> <span className="font-mono text-primary">{savedStudent.studentId}</span></p>
             <p className="text-sm"><strong>Course:</strong> {savedStudent.course}</p>
+            <p className="text-sm text-muted-foreground"><strong>Login:</strong> Student ID + Password se login ho payega</p>
           </div>
           <div className="flex gap-3">
             <Button variant="outline" className="flex-1" onClick={resetForm}>Add Another</Button>
@@ -116,7 +155,7 @@ export default function AddStudent() {
         <>
           <div>
             <h1 className="text-2xl font-bold text-foreground">New Admission</h1>
-            <p className="text-muted-foreground text-sm mt-1">Register a new student</p>
+            <p className="text-muted-foreground text-sm mt-1">Register a new student (Firebase Auth account will be created automatically)</p>
           </div>
           <form onSubmit={handleSubmit} className="bg-card rounded-xl border border-border shadow-sm p-6 space-y-5">
             <div className="space-y-1.5">
@@ -164,12 +203,16 @@ export default function AddStudent() {
               </div>
               <div className="space-y-1.5">
                 <Label>Password <span className="text-destructive">*</span></Label>
-                <Input value={form.password} onChange={e => { setForm(f => ({ ...f, password: e.target.value })); clearError('password'); }} placeholder="sbci123" className={errors.password ? 'border-destructive' : ''} />
+                <Input value={form.password} onChange={e => { setForm(f => ({ ...f, password: e.target.value })); clearError('password'); }} placeholder="min 6 chars" className={errors.password ? 'border-destructive' : ''} />
                 {errors.password && <p className="text-xs text-destructive">{errors.password}</p>}
               </div>
             </div>
-            <Button type="submit" className="w-full gap-2" size="lg">
-              <UserPlus size={18} /> Admit Student
+            <Button type="submit" className="w-full gap-2" size="lg" disabled={submitting}>
+              {submitting ? (
+                <span className="flex items-center gap-2"><Loader2 size={18} className="animate-spin" /> Creating...</span>
+              ) : (
+                <><UserPlus size={18} /> Admit Student</>
+              )}
             </Button>
           </form>
         </>

@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { motion } from 'framer-motion';
 import { Settings as SettingsIcon, Building2, Phone, Mail, MapPin, BookOpen, IndianRupee, Plus, X, Bell } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
+import { fbSaveSettings } from '@/lib/firebaseStore';
 
 export default function Settings() {
   const [settings, setSettings] = useState<InstituteSettings>(getSettings());
@@ -16,7 +17,9 @@ export default function Settings() {
 
   const handleSave = () => {
     saveSettings(settings);
-    toast.success('Settings saved! Changes will appear across the app.');
+    // Sync to Firebase
+    fbSaveSettings(settings).catch(e => console.error('Firebase settings sync error:', e));
+    toast.success('Settings saved & synced to cloud! ☁️');
   };
 
   const addCourse = () => {

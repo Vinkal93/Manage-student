@@ -1,33 +1,31 @@
-import { initializeApp, FirebaseApp } from "firebase/app";
-import { getAuth, Auth } from "firebase/auth";
-import { getFirestore, Firestore } from "firebase/firestore";
+import { initializeApp } from "firebase/app";
+import { getAuth } from "firebase/auth";
+import { getDatabase } from "firebase/database";
+import { getAnalytics, isSupported as isAnalyticsSupported } from "firebase/analytics";
 
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
+  apiKey: "AIzaSyDLURuU1Y_HWNPv9moAzxsg1TzgFeUXM4A",
+  authDomain: "student-manage-54e0f.firebaseapp.com",
+  databaseURL: "https://student-manage-54e0f-default-rtdb.us-central1.firebasedatabase.app",
+  projectId: "student-manage-54e0f",
+  storageBucket: "student-manage-54e0f.firebasestorage.app",
+  messagingSenderId: "779050157881",
+  appId: "1:779050157881:web:e9aa91d6f8f4045f0c4ae8",
+  measurementId: "G-PT38288SH7"
 };
 
-let app: FirebaseApp | null = null;
-let auth: Auth | null = null;
-let db: Firestore | null = null;
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const rtdb = getDatabase(app);
 
-// Only initialize Firebase if API key is configured
-if (firebaseConfig.apiKey) {
-  try {
-    app = initializeApp(firebaseConfig);
-    auth = getAuth(app);
-    db = getFirestore(app);
-  } catch (e) {
-    console.warn('Firebase initialization failed:', e);
+// Analytics (only in browser, not SSR)
+let analytics: ReturnType<typeof getAnalytics> | null = null;
+isAnalyticsSupported().then(supported => {
+  if (supported) {
+    analytics = getAnalytics(app);
   }
-} else {
-  console.info('Firebase not configured — using localStorage fallback');
-}
+});
 
-export { auth, db };
+export { app, auth, rtdb, analytics };
 export default app;

@@ -1,13 +1,13 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { loginWithFirebase, login } from '@/lib/auth';
+import { loginWithFirebase, getCurrentUser, onAuthChange } from '@/lib/auth';
 import { getSettings } from '@/lib/settings';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
-import { Lock, User, GraduationCap, Shield, ArrowLeft } from 'lucide-react';
+import { Lock, User, GraduationCap, Shield, ArrowLeft, Loader2 } from 'lucide-react';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -16,7 +16,35 @@ export default function Login() {
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [checkingAuth, setCheckingAuth] = useState(true);
   const [errors, setErrors] = useState<{ identifier?: string; password?: string }>({});
+
+  // Check if already logged in
+  useEffect(() => {
+    const user = getCurrentUser();
+    if (user) {
+      navigate(user.role === 'admin' ? '/admin' : '/student', { replace: true });
+      return;
+    }
+
+    const unsub = onAuthChange((firebaseUser) => {
+      if (firebaseUser) {
+        const cachedUser = getCurrentUser();
+        if (cachedUser) {
+          navigate(cachedUser.role === 'admin' ? '/admin' : '/student', { replace: true });
+        }
+      }
+      setCheckingAuth(false);
+    });
+
+    // Timeout fallback
+    const timeout = setTimeout(() => setCheckingAuth(false), 2000);
+
+    return () => {
+      unsub();
+      clearTimeout(timeout);
+    };
+  }, [navigate]);
 
   const validate = (): boolean => {
     const newErrors: typeof errors = {};
@@ -29,8 +57,8 @@ export default function Login() {
     }
     if (!password.trim()) {
       newErrors.password = 'Password is required';
-    } else if (password.length < 4) {
-      newErrors.password = 'Password must be at least 4 characters';
+    } else if (password.length < 6) {
+      newErrors.password = 'Password must be at least 6 characters';
     }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -42,27 +70,27 @@ export default function Login() {
     setLoading(true);
 
     try {
-      let user = await loginWithFirebase(identifier, password);
-      if (!user) {
-        user = login(identifier, password);
-      }
+      const user = await loginWithFirebase(identifier, password);
       if (user) {
-        toast.success(`Welcome ${user.name}!`);
+        toast.success(`Welcome ${user.name}! 🎉`);
         navigate(user.role === 'admin' ? '/admin' : '/student');
       } else {
-        toast.error('Invalid credentials');
+        toast.error('Invalid email or password. Please check your credentials.');
       }
-    } catch {
-      const user = login(identifier, password);
-      if (user) {
-        toast.success(`Welcome ${user.name}!`);
-        navigate(user.role === 'admin' ? '/admin' : '/student');
-      } else {
-        toast.error('Invalid credentials');
-      }
+    } catch (err: any) {
+      console.error('Login error:', err);
+      toast.error('Login failed. Please try again.');
     }
     setLoading(false);
   };
+
+  if (checkingAuth) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="animate-spin text-primary" size={32} />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
@@ -105,7 +133,7 @@ export default function Login() {
               <div className="relative">
                 <User className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
                 <Input
-                  placeholder={mode === 'admin' ? 'admin@sbci.com' : 'e.g. SBCI0001'}
+                  placeholder={mode === 'admin' ? 'admin@example.com' : 'e.g. SBCI0001'}
                   value={identifier}
                   onChange={e => { setIdentifier(e.target.value); if (errors.identifier) setErrors(er => ({ ...er, identifier: undefined })); }}
                   className={`pl-9 ${errors.identifier ? 'border-destructive' : ''}`}
@@ -128,13 +156,16 @@ export default function Login() {
               {errors.password && <p className="text-xs text-destructive">{errors.password}</p>}
             </div>
             <Button type="submit" className="w-full" size="lg" disabled={loading}>
-              {loading ? 'Logging in...' : 'Login'}
+              {loading ? (
+                <span className="flex items-center gap-2"><Loader2 size={16} className="animate-spin" /> Logging in...</span>
+              ) : 'Login'}
             </Button>
           </form>
 
-          <p className="text-xs text-center text-muted-foreground">
-            Login credentials are provided by the institute administrator
-          </p>
+          <div className="text-xs text-center text-muted-foreground space-y-1">
+            <p>🔒 Secured with Firebase Authentication</p>
+            <p>Login credentials are provided by the institute administrator</p>
+          </div>
         </div>
 
         <p className="text-center text-xs text-muted-foreground mt-4">© 2026 InSuite Manage</p>

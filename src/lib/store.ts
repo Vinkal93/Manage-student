@@ -1,3 +1,5 @@
+import { fbGetStudents, fbSaveAllStudents, fbSaveStudent, fbUpdateStudent } from './firebaseStore';
+
 export interface Student {
   id: string;
   studentId: string;
@@ -48,7 +50,11 @@ export interface MessageRecord {
 }
 
 const STORAGE_KEY = 'sbci_students';
-let lastStudentNumber = 0;
+
+// In-memory cache for students (loaded from Firebase)
+let studentsCache: Student[] | null = null;
+let cacheTimestamp = 0;
+const CACHE_TTL = 5000; // 5 seconds cache
 
 function getNextStudentId(): string {
   const students = getStudents();
@@ -57,16 +63,36 @@ function getNextStudentId(): string {
     return isNaN(num) ? 0 : num;
   });
   const max = numbers.length > 0 ? Math.max(...numbers) : 0;
-  lastStudentNumber = max + 1;
-  return 'SBCI' + String(lastStudentNumber).padStart(4, '0');
+  return 'SBCI' + String(max + 1).padStart(4, '0');
 }
 
+/**
+ * Get students — reads from localStorage cache (Firebase syncs in background)
+ */
 export function getStudents(): Student[] {
   const data = localStorage.getItem(STORAGE_KEY);
   if (data) return JSON.parse(data);
-  const sample = getSampleStudents();
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(sample));
-  return sample;
+  return [];
+}
+
+/**
+ * Load students from Firebase and update localStorage cache
+ */
+export async function loadStudentsFromFirebase(): Promise<Student[]> {
+  try {
+    const students = await fbGetStudents();
+    if (students.length > 0) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(students));
+      studentsCache = students;
+      cacheTimestamp = Date.now();
+      return students;
+    }
+    // If Firebase is empty, return localStorage data
+    return getStudents();
+  } catch (e) {
+    console.error('loadStudentsFromFirebase error:', e);
+    return getStudents();
+  }
 }
 
 export function getStudentById(id: string): Student | undefined {
@@ -77,10 +103,18 @@ export function getStudentByStudentId(studentId: string): Student | undefined {
   return getStudents().find(s => s.studentId === studentId);
 }
 
+/**
+ * Save students to both localStorage and Firebase
+ */
 export function saveStudents(students: Student[]) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(students));
+  // Async save to Firebase (fire and forget)
+  fbSaveAllStudents(students).catch(e => console.error('Firebase save error:', e));
 }
 
+/**
+ * Add a new student — saves to localStorage + Firebase
+ */
 export function addStudent(data: { name: string; fatherName: string; mobile: string; course: string; admissionDate: string; feeAmount: number; whatsappNumber?: string }): Student {
   const students = getStudents();
   const studentId = getNextStudentId();
@@ -229,51 +263,6 @@ function generateAttendance(admissionDate: string): AttendanceRecord[] {
   }
 
   return records;
-}
-
-function getSampleStudents(): Student[] {
-  const courses = ['ADCA', 'DCA', 'Tally', 'CCC', 'PGDCA', 'Web Design'];
-  const names = [
-    { name: 'Rahul Sharma', father: 'Suresh Sharma' },
-    { name: 'Priya Gupta', father: 'Rajesh Gupta' },
-    { name: 'Amit Kumar', father: 'Ramesh Kumar' },
-    { name: 'Sneha Verma', father: 'Anil Verma' },
-    { name: 'Vikash Singh', father: 'Manoj Singh' },
-    { name: 'Pooja Yadav', father: 'Dinesh Yadav' },
-    { name: 'Rohit Patel', father: 'Kailash Patel' },
-    { name: 'Anjali Mishra', father: 'Pramod Mishra' },
-    { name: 'Neha Bharti', father: 'Sunil Bharti' },
-    { name: 'Deepak Tiwari', father: 'Rakesh Tiwari' },
-  ];
-
-  return names.map((n, i) => {
-    const admDate = new Date();
-    admDate.setMonth(admDate.getMonth() - Math.floor(Math.random() * 6 + 1));
-    const fee = [500, 800, 600, 400, 1000, 700][i % 6];
-    const studentId = 'SBCI' + String(i + 1).padStart(4, '0');
-    const admDateStr = admDate.toISOString().split('T')[0];
-
-    return {
-      id: crypto.randomUUID(),
-      studentId,
-      name: n.name,
-      fatherName: n.father,
-      mobile: `98${Math.floor(10000000 + Math.random() * 90000000)}`,
-      whatsappNumber: `98${Math.floor(10000000 + Math.random() * 90000000)}`,
-      course: courses[i % courses.length],
-      admissionDate: admDateStr,
-      feeAmount: fee,
-      feeCycle: 'monthly' as const,
-      status: Math.random() > 0.15 ? 'active' as const : 'stopped' as const,
-      password: 'sbci123',
-      feeRecords: generateFeeRecords(admDateStr, fee),
-      attendance: generateAttendance(admDateStr),
-      messageHistory: [
-        { id: crypto.randomUUID(), date: admDateStr, type: 'welcome' as const, message: `Welcome ${n.name}!`, status: 'sent' as const },
-        { id: crypto.randomUUID(), date: new Date().toISOString().split('T')[0], type: 'reminder' as const, message: `Fee reminder for ${n.name}`, status: 'sent' as const },
-      ],
-    };
-  });
 }
 
 export function getDashboardStats(students: Student[]) {

@@ -3,8 +3,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { motion } from 'framer-motion';
-import { Download, Upload, Database, FileJson, AlertTriangle, CheckCircle, HardDrive, RefreshCw } from 'lucide-react';
+import { Download, Upload, Database, FileJson, AlertTriangle, CheckCircle, HardDrive, RefreshCw, Cloud, CloudUpload, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { fbSaveAllStudents, fbSaveSettings, fbSaveTimetable, fbSaveAssignments, fbSaveFeatures, fbGetStudents, fbGetSettings, fbGetTimetable, fbGetAssignments, fbGetFeatures } from '@/lib/firebaseStore';
 
 const BACKUP_KEYS = [
   { key: 'sbci_students', label: 'Students Data', icon: '👨‍🎓' },
@@ -16,6 +17,8 @@ const BACKUP_KEYS = [
 export default function Backup() {
   const [restoreFile, setRestoreFile] = useState<File | null>(null);
   const [lastBackup, setLastBackup] = useState(localStorage.getItem('insuite_last_backup') || 'Never');
+  const [syncing, setSyncing] = useState(false);
+  const [pulling, setPulling] = useState(false);
 
   const handleFullBackup = () => {
     const backup: Record<string, any> = { _meta: { version: '1.0', date: new Date().toISOString(), platform: 'InSuite Manage' } };
@@ -79,6 +82,70 @@ export default function Backup() {
     reader.readAsText(restoreFile);
   };
 
+  // Push all localStorage data to Firebase
+  const handleCloudSync = async () => {
+    setSyncing(true);
+    try {
+      const students = JSON.parse(localStorage.getItem('sbci_students') || '[]');
+      if (students.length > 0) {
+        const data: Record<string, any> = {};
+        students.forEach((s: any) => { data[s.id] = s; });
+        await fbSaveAllStudents(students);
+      }
+
+      const settings = localStorage.getItem('sbci_settings');
+      if (settings) await fbSaveSettings(JSON.parse(settings));
+
+      const timetable = localStorage.getItem('insuite_timetable');
+      if (timetable) await fbSaveTimetable(JSON.parse(timetable));
+
+      const assignments = localStorage.getItem('insuite_assignments');
+      if (assignments) await fbSaveAssignments(JSON.parse(assignments));
+
+      const features = localStorage.getItem('insuite_features_v1');
+      if (features) await fbSaveFeatures(JSON.parse(features));
+
+      const now = new Date().toLocaleString('en-IN');
+      localStorage.setItem('insuite_last_backup', now);
+      setLastBackup(now);
+      toast.success('✅ All data synced to Firebase Cloud!');
+    } catch (err) {
+      console.error('Cloud sync error:', err);
+      toast.error('Cloud sync failed. Please try again.');
+    }
+    setSyncing(false);
+  };
+
+  // Pull data from Firebase to localStorage
+  const handleCloudPull = async () => {
+    setPulling(true);
+    try {
+      const students = await fbGetStudents();
+      if (students.length > 0) {
+        localStorage.setItem('sbci_students', JSON.stringify(students));
+      }
+
+      const settings = await fbGetSettings();
+      if (settings) localStorage.setItem('sbci_settings', JSON.stringify(settings));
+
+      const timetable = await fbGetTimetable();
+      if (timetable) localStorage.setItem('insuite_timetable', JSON.stringify(timetable));
+
+      const assignments = await fbGetAssignments();
+      if (assignments && assignments.length > 0) localStorage.setItem('insuite_assignments', JSON.stringify(assignments));
+
+      const features = await fbGetFeatures();
+      if (features) localStorage.setItem('insuite_features_v1', JSON.stringify(features));
+
+      toast.success('✅ Data pulled from Firebase Cloud!');
+      setTimeout(() => window.location.reload(), 1000);
+    } catch (err) {
+      console.error('Cloud pull error:', err);
+      toast.error('Cloud pull failed. Please try again.');
+    }
+    setPulling(false);
+  };
+
   const getDataSize = (key: string) => {
     const data = localStorage.getItem(key);
     if (!data) return '0 B';
@@ -91,14 +158,32 @@ export default function Backup() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-foreground flex items-center gap-2"><Database size={24} /> Backup & Restore</h1>
-        <p className="text-sm text-muted-foreground">Manage your institute data backups</p>
+        <p className="text-sm text-muted-foreground">Manage your institute data backups — local + Firebase Cloud</p>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Card><CardContent className="p-4 text-center"><HardDrive className="mx-auto mb-2 text-primary" size={24} /><div className="text-lg font-bold text-foreground">{BACKUP_KEYS.reduce((t, k) => t + (localStorage.getItem(k.key) ? 1 : 0), 0)}</div><p className="text-xs text-muted-foreground">Data Sets Available</p></CardContent></Card>
         <Card><CardContent className="p-4 text-center"><RefreshCw className="mx-auto mb-2 text-accent" size={24} /><div className="text-sm font-bold text-foreground">{lastBackup}</div><p className="text-xs text-muted-foreground">Last Backup</p></CardContent></Card>
-        <Card><CardContent className="p-4 text-center"><FileJson className="mx-auto mb-2 text-warning" size={24} /><div className="text-lg font-bold text-foreground">{BACKUP_KEYS.reduce((t, k) => t + new Blob([localStorage.getItem(k.key) || '']).size, 0) > 1024 ? `${(BACKUP_KEYS.reduce((t, k) => t + new Blob([localStorage.getItem(k.key) || '']).size, 0) / 1024).toFixed(1)} KB` : `${BACKUP_KEYS.reduce((t, k) => t + new Blob([localStorage.getItem(k.key) || '']).size, 0)} B`}</div><p className="text-xs text-muted-foreground">Total Data Size</p></CardContent></Card>
+        <Card><CardContent className="p-4 text-center"><Cloud className="mx-auto mb-2 text-success" size={24} /><div className="text-lg font-bold text-foreground">🔥</div><p className="text-xs text-muted-foreground">Firebase Connected</p></CardContent></Card>
       </div>
+
+      {/* Firebase Cloud Sync */}
+      <Card className="border-primary/30 bg-primary/5">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-primary"><Cloud size={18} /> Firebase Cloud Backup</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">One-click cloud backup — saara data Firebase Realtime Database me sync ho jayega.</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Button onClick={handleCloudSync} className="gap-2" disabled={syncing}>
+              {syncing ? <><Loader2 size={16} className="animate-spin" /> Syncing...</> : <><CloudUpload size={16} /> Push to Cloud</>}
+            </Button>
+            <Button variant="outline" onClick={handleCloudPull} className="gap-2" disabled={pulling}>
+              {pulling ? <><Loader2 size={16} className="animate-spin" /> Pulling...</> : <><Download size={16} /> Pull from Cloud</>}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
