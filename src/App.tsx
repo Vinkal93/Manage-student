@@ -75,8 +75,8 @@ function AdminLayout({ children }: { children: React.ReactNode }) {
 function StudentLayout({ children }: { children: React.ReactNode }) {
   const settings = getSettings();
   return (
-    <div className="min-h-screen">
-      <header className="bg-primary text-primary-foreground px-4 py-3 flex items-center justify-between">
+    <div className="min-h-screen bg-background">
+      <header className="hidden md:flex bg-primary text-primary-foreground px-4 py-3 items-center justify-between sticky top-0 z-30 shadow">
         <div>
           <h1 className="text-lg font-bold">{settings.instituteName}</h1>
           <p className="text-xs opacity-80">Student Panel</p>
@@ -91,7 +91,7 @@ function StudentLayout({ children }: { children: React.ReactNode }) {
           </button>
         </div>
       </header>
-      <main className="p-4 md:p-8 pt-16 md:pt-4 pb-4">
+      <main className="px-4 py-4 md:px-8 md:py-6 pt-16 md:pt-6 pb-24 max-w-5xl mx-auto">
         {children}
         <Footer />
       </main>
