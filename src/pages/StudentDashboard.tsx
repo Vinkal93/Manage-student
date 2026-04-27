@@ -58,12 +58,23 @@ export default function StudentDashboard() {
 
   return (
     <div className="space-y-6">
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-        <h1 className="text-2xl font-bold text-foreground">Welcome {student.name} 👋</h1>
-        <div className="flex flex-wrap gap-2 mt-2">
-          <Badge variant="outline" className="gap-1"><GraduationCap size={12} /> {student.studentId}</Badge>
-          <Badge variant="secondary">{student.course}</Badge>
-          <Badge variant="outline">Joined {new Date(student.admissionDate).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })}</Badge>
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+        className="flex items-center gap-4 bg-card rounded-xl border border-border p-4">
+        {student.photo ? (
+          <img src={student.photo} alt={student.name}
+            className="w-16 h-16 rounded-full object-cover border-2 border-primary shadow-sm" />
+        ) : (
+          <div className="w-16 h-16 rounded-full bg-primary/10 border-2 border-primary/30 flex items-center justify-center text-xl font-bold text-primary shadow-sm">
+            {student.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+          </div>
+        )}
+        <div className="flex-1 min-w-0">
+          <h1 className="text-xl sm:text-2xl font-bold text-foreground truncate">Welcome {student.name} 👋</h1>
+          <div className="flex flex-wrap gap-1.5 mt-1.5">
+            <Badge variant="outline" className="gap-1 text-[10px]"><GraduationCap size={10} /> {student.studentId}</Badge>
+            <Badge variant="secondary" className="text-[10px]">{student.course}</Badge>
+            <Badge variant="outline" className="text-[10px]">Joined {new Date(student.admissionDate).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })}</Badge>
+          </div>
         </div>
       </motion.div>
 
@@ -90,13 +101,13 @@ export default function StudentDashboard() {
       )}
 
       <Tabs defaultValue="messages" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-3 sm:grid-cols-6">
-          <TabsTrigger value="messages" className="text-xs gap-1"><MessageSquare size={14} /> Messages</TabsTrigger>
-          <TabsTrigger value="assignments" className="text-xs gap-1"><FileText size={14} /> Assignments</TabsTrigger>
-          <TabsTrigger value="fees" className="text-xs gap-1"><CreditCard size={14} /> Fees</TabsTrigger>
-          <TabsTrigger value="attendance" className="text-xs gap-1"><ClipboardList size={14} /> Attendance</TabsTrigger>
-          <TabsTrigger value="course" className="text-xs gap-1"><BookOpen size={14} /> Course</TabsTrigger>
-          <TabsTrigger value="resources" className="text-xs gap-1"><LinkIcon size={14} /> More</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-3 sm:grid-cols-6 h-auto p-1.5 bg-muted/60 gap-1">
+          <TabsTrigger value="messages" className="text-xs gap-1 py-2 px-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow font-medium"><MessageSquare size={14} /> <span className="hidden xs:inline sm:inline">Messages</span></TabsTrigger>
+          <TabsTrigger value="assignments" className="text-xs gap-1 py-2 px-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow font-medium"><FileText size={14} /> <span>Tasks</span></TabsTrigger>
+          <TabsTrigger value="fees" className="text-xs gap-1 py-2 px-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow font-medium"><CreditCard size={14} /> Fees</TabsTrigger>
+          <TabsTrigger value="attendance" className="text-xs gap-1 py-2 px-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow font-medium"><ClipboardList size={14} /> <span className="hidden xs:inline">Att.</span><span className="xs:hidden">Att</span></TabsTrigger>
+          <TabsTrigger value="course" className="text-xs gap-1 py-2 px-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow font-medium"><BookOpen size={14} /> Course</TabsTrigger>
+          <TabsTrigger value="resources" className="text-xs gap-1 py-2 px-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow font-medium"><LinkIcon size={14} /> More</TabsTrigger>
         </TabsList>
 
         <TabsContent value="messages">
