@@ -7,11 +7,14 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import StatCard from '@/components/StatCard';
 import { motion } from 'framer-motion';
-import { GraduationCap, CreditCard, ClipboardList, MessageSquare, BookOpen, FileText, Bell } from 'lucide-react';
+import { GraduationCap, CreditCard, ClipboardList, MessageSquare, BookOpen, FileText, Bell, Link as LinkIcon, Youtube, Download, QrCode } from 'lucide-react';
+import { getFeatures, calcLateFee } from '@/lib/features';
+import { Link } from 'react-router-dom';
 
 export default function StudentDashboard() {
   const user = getCurrentUser();
   const settings = getSettings();
+  const features = getFeatures();
   const student = useMemo(() => {
     const students = getStudents();
     return students.find(s => s.id === user?.id || s.studentId === user?.studentId);
@@ -49,6 +52,9 @@ export default function StudentDashboard() {
   const paidFees = student.feeRecords.filter(f => f.status === 'paid').length;
   const pendingFees = student.feeRecords.filter(f => f.status !== 'paid').length;
   const totalPaid = student.feeRecords.filter(f => f.status === 'paid').reduce((a, b) => a + b.amount, 0);
+  const totalLate = student.feeRecords.reduce((acc, f) => acc + calcLateFee(f.dueDate, f.status === 'paid', f.paidDate), 0);
+  const totalPending = student.feeRecords.filter(f => f.status !== 'paid').reduce((a, b) => a + b.amount, 0);
+  const totalPayable = totalPending + totalLate;
 
   return (
     <div className="space-y-6">
@@ -65,16 +71,32 @@ export default function StudentDashboard() {
         <StatCard title="Attendance" value={`${attendancePercent}%`} icon={ClipboardList} variant="primary" />
         <StatCard title="Fees Paid" value={paidFees} icon={CreditCard} variant="success" />
         <StatCard title="Pending Fees" value={pendingFees} icon={CreditCard} variant="warning" />
-        <StatCard title="Total Paid" value={`₹${totalPaid.toLocaleString()}`} icon={CreditCard} variant="accent" />
+        <StatCard title="Total Payable" value={`₹${totalPayable.toLocaleString()}`} icon={CreditCard} variant="accent" />
       </div>
 
+      {features.toggles.onlinePayment && totalPayable > 0 && (
+        <Link to="/student/payment" className="block bg-gradient-to-r from-primary to-primary/80 text-primary-foreground rounded-xl p-4 shadow-md hover:shadow-lg transition-shadow">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs opacity-80">Pending Payment</p>
+              <p className="text-2xl font-bold">₹{totalPayable.toLocaleString()}</p>
+              {totalLate > 0 && <p className="text-xs opacity-80 mt-1">Includes ₹{totalLate} late fee</p>}
+            </div>
+            <div className="flex items-center gap-2 bg-primary-foreground/20 px-4 py-2 rounded-lg">
+              <QrCode size={18} /> Pay Now
+            </div>
+          </div>
+        </Link>
+      )}
+
       <Tabs defaultValue="messages" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-3 sm:grid-cols-6">
           <TabsTrigger value="messages" className="text-xs gap-1"><MessageSquare size={14} /> Messages</TabsTrigger>
           <TabsTrigger value="assignments" className="text-xs gap-1"><FileText size={14} /> Assignments</TabsTrigger>
           <TabsTrigger value="fees" className="text-xs gap-1"><CreditCard size={14} /> Fees</TabsTrigger>
           <TabsTrigger value="attendance" className="text-xs gap-1"><ClipboardList size={14} /> Attendance</TabsTrigger>
           <TabsTrigger value="course" className="text-xs gap-1"><BookOpen size={14} /> Course</TabsTrigger>
+          <TabsTrigger value="resources" className="text-xs gap-1"><LinkIcon size={14} /> More</TabsTrigger>
         </TabsList>
 
         <TabsContent value="messages">
@@ -212,6 +234,47 @@ export default function StudentDashboard() {
               <p>• Late fee of ₹{settings.lateFeeAmount} may apply after {settings.feeDueDate}th</p>
               <p>• Minimum 75% attendance required for certificate</p>
               <p>• Classes may be stopped for pending fees beyond 20 days</p>
+            </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="resources">
+          <div className="space-y-4">
+            {features.toggles.importantLinks && features.importantLinks.filter(l => l.visible).length > 0 && (
+              <div className="bg-card rounded-xl border border-border p-4 space-y-2">
+                <h3 className="font-semibold text-sm flex items-center gap-2"><LinkIcon size={14}/> Important Links</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {features.importantLinks.filter(l => l.visible).map(l => (
+                    <a key={l.id} href={l.url} target="_blank" rel="noreferrer" className="text-sm p-2 rounded-lg border border-border hover:bg-muted/50 transition-colors">
+                      🔗 {l.title}
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+            {features.toggles.studyMaterial && features.studyMaterial.filter(l => l.visible).length > 0 && (
+              <div className="bg-card rounded-xl border border-border p-4 space-y-2">
+                <h3 className="font-semibold text-sm flex items-center gap-2"><BookOpen size={14}/> Study Material</h3>
+                <div className="space-y-2">
+                  {features.studyMaterial.filter(l => l.visible).map(l => (
+                    <a key={l.id} href={l.url} target="_blank" rel="noreferrer" className="block text-sm p-2 rounded-lg border border-border hover:bg-muted/50 transition-colors">
+                      📚 {l.title}{l.description && <span className="text-xs text-muted-foreground block">{l.description}</span>}
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div className="grid grid-cols-2 gap-2">
+              {features.toggles.youtube && features.youtubeUrl && (
+                <a href={features.youtubeUrl} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-2 p-3 rounded-xl bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20 text-sm font-medium">
+                  <Youtube size={16} /> YouTube Channel
+                </a>
+              )}
+              {features.toggles.downloadApp && features.appDownloadUrl && (
+                <a href={features.appDownloadUrl} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-2 p-3 rounded-xl bg-primary/10 text-primary border border-primary/20 text-sm font-medium">
+                  <Download size={16} /> Download App
+                </a>
+              )}
             </div>
           </div>
         </TabsContent>
