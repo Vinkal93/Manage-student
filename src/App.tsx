@@ -37,6 +37,7 @@ import Backup from "@/pages/Backup";
 import DatabaseSettings from "@/pages/DatabaseSettings";
 import DatabaseGuide from "@/pages/DatabaseGuide";
 import FeeRecord from "@/pages/FeeRecord";
+import FeeCalendar from "@/pages/FeeCalendar";
 import ParentPortal from "@/pages/ParentPortal";
 import StudentTimetable from "@/pages/StudentTimetable";
 import StudentAssignments from "@/pages/StudentAssignments";
@@ -139,6 +140,7 @@ const App = () => (
           <Route path="/admin/database" element={<ProtectedRoute role="admin"><AdminLayout><DatabaseSettings /></AdminLayout></ProtectedRoute>} />
           <Route path="/admin/database/guide/:dbType" element={<ProtectedRoute role="admin"><AdminLayout><DatabaseGuide /></AdminLayout></ProtectedRoute>} />
           <Route path="/admin/fee-record" element={<ProtectedRoute role="admin"><AdminLayout><FeeRecord /></AdminLayout></ProtectedRoute>} />
+          <Route path="/admin/fee-calendar" element={<ProtectedRoute role="admin"><AdminLayout><FeeCalendar /></AdminLayout></ProtectedRoute>} />
           <Route path="/admin/features" element={<ProtectedRoute role="admin"><AdminLayout><FeatureToggles /></AdminLayout></ProtectedRoute>} />
           <Route path="/admin/student/:id" element={<ProtectedRoute role="admin"><AdminLayout><StudentProfile /></AdminLayout></ProtectedRoute>} />
 
