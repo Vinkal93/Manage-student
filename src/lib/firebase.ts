@@ -3,15 +3,16 @@ import { getAuth } from "firebase/auth";
 import { getDatabase } from "firebase/database";
 import { getAnalytics, isSupported as isAnalyticsSupported } from "firebase/analytics";
 
+// All secrets loaded from .env (VITE_ prefix required for Vite)
 const firebaseConfig = {
-  apiKey: "AIzaSyDLURuU1Y_HWNPv9moAzxsg1TzgFeUXM4A",
-  authDomain: "student-manage-54e0f.firebaseapp.com",
-  databaseURL: "https://student-manage-54e0f-default-rtdb.us-central1.firebasedatabase.app",
-  projectId: "student-manage-54e0f",
-  storageBucket: "student-manage-54e0f.firebasestorage.app",
-  messagingSenderId: "779050157881",
-  appId: "1:779050157881:web:e9aa91d6f8f4045f0c4ae8",
-  measurementId: "G-PT38288SH7"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  databaseURL: import.meta.env.VITE_FIREBASE_DATABASE_URL,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
 };
 
 // Initialize Firebase
