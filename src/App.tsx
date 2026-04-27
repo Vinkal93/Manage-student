@@ -40,7 +40,11 @@ import FeeRecord from "@/pages/FeeRecord";
 import ParentPortal from "@/pages/ParentPortal";
 import StudentTimetable from "@/pages/StudentTimetable";
 import StudentAssignments from "@/pages/StudentAssignments";
+import StudentPayment from "@/pages/StudentPayment";
+import FeatureToggles from "@/pages/FeatureToggles";
 import NotFound from "./pages/NotFound";
+import AIChatbot from "@/components/AIChatbot";
+import Footer from "@/components/Footer";
 
 // Initialize theme
 initTheme();
@@ -58,9 +62,11 @@ function AdminLayout({ children }: { children: React.ReactNode }) {
         </header>
         <main className="flex-1 p-4 md:p-8 pt-16 md:pt-4 pb-4 overflow-auto">
           {children}
+          <Footer />
         </main>
       </div>
       <MobileNav />
+      <AIChatbot />
     </div>
   );
 }
@@ -86,8 +92,10 @@ function StudentLayout({ children }: { children: React.ReactNode }) {
       </header>
       <main className="p-4 md:p-8 pt-16 md:pt-4 pb-4">
         {children}
+        <Footer />
       </main>
       <MobileNav />
+      <AIChatbot />
     </div>
   );
 }
@@ -131,12 +139,14 @@ const App = () => (
           <Route path="/admin/database" element={<ProtectedRoute role="admin"><AdminLayout><DatabaseSettings /></AdminLayout></ProtectedRoute>} />
           <Route path="/admin/database/guide/:dbType" element={<ProtectedRoute role="admin"><AdminLayout><DatabaseGuide /></AdminLayout></ProtectedRoute>} />
           <Route path="/admin/fee-record" element={<ProtectedRoute role="admin"><AdminLayout><FeeRecord /></AdminLayout></ProtectedRoute>} />
+          <Route path="/admin/features" element={<ProtectedRoute role="admin"><AdminLayout><FeatureToggles /></AdminLayout></ProtectedRoute>} />
           <Route path="/admin/student/:id" element={<ProtectedRoute role="admin"><AdminLayout><StudentProfile /></AdminLayout></ProtectedRoute>} />
 
           {/* Student Routes */}
           <Route path="/student" element={<ProtectedRoute role="student"><StudentLayout><StudentDashboard /></StudentLayout></ProtectedRoute>} />
           <Route path="/student/timetable" element={<ProtectedRoute role="student"><StudentLayout><StudentTimetable /></StudentLayout></ProtectedRoute>} />
           <Route path="/student/assignments" element={<ProtectedRoute role="student"><StudentLayout><StudentAssignments /></StudentLayout></ProtectedRoute>} />
+          <Route path="/student/payment" element={<ProtectedRoute role="student"><StudentLayout><StudentPayment /></StudentLayout></ProtectedRoute>} />
 
           <Route path="*" element={<NotFound />} />
         </Routes>
