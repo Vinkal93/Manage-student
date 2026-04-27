@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { LayoutDashboard, Users, IndianRupee, ClipboardList, UserCog, Activity, Calendar, FileText, Menu, X, MessageSquare, Send, BarChart3, Database, Sheet, Settings, LogOut, UserPlus, Wallet, GraduationCap } from 'lucide-react';
+import { LayoutDashboard, Users, IndianRupee, ClipboardList, UserCog, Activity, Calendar, FileText, Menu, X, MessageSquare, Send, BarChart3, Database, Sheet, Settings, LogOut, UserPlus, Wallet, GraduationCap, CalendarDays, Link as LinkIcon, BookOpen, CreditCard, Youtube, Download } from 'lucide-react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { getFeatures } from '@/lib/features';
 import { getCurrentUser, logout } from '@/lib/auth';
 import { getSettings } from '@/lib/settings';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -13,6 +14,7 @@ const adminLinks = [
   { to: '/admin/fees', label: 'Fee Tracking', icon: IndianRupee },
   { to: '/admin/fee-management', label: 'Fee Management', icon: Wallet },
   { to: '/admin/fee-record', label: 'Fee Record', icon: IndianRupee },
+  { to: '/admin/fee-calendar', label: 'Fee Calendar', icon: CalendarDays },
   { to: '/admin/timetable', label: 'Timetable', icon: Calendar },
   { to: '/admin/assignments', label: 'Assignments', icon: FileText },
   { to: '/admin/attendance', label: 'Attendance', icon: ClipboardList },
@@ -29,6 +31,7 @@ const studentLinks = [
   { to: '/student', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/student/timetable', label: 'Timetable', icon: Calendar },
   { to: '/student/assignments', label: 'Assignments', icon: FileText },
+  { to: '/student/payment', label: 'Pay Fees', icon: CreditCard },
 ];
 
 export default function MobileNav() {
@@ -40,6 +43,9 @@ export default function MobileNav() {
 
   const isAdmin = user?.role === 'admin';
   const links = isAdmin ? adminLinks : studentLinks;
+  const features = getFeatures();
+  const importantLinks = !isAdmin && features.toggles.importantLinks ? features.importantLinks.filter(l => l.visible) : [];
+  const studyMaterial = !isAdmin && features.toggles.studyMaterial ? features.studyMaterial.filter(l => l.visible) : [];
 
   const handleLogout = () => {
     logout();
@@ -111,6 +117,44 @@ export default function MobileNav() {
                     </NavLink>
                   );
                 })}
+                {!isAdmin && importantLinks.length > 0 && (
+                  <div className="pt-3 mt-2 border-t border-sidebar-border">
+                    <p className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-sidebar-muted flex items-center gap-1.5"><LinkIcon size={11}/> Important Links</p>
+                    {importantLinks.map(l => (
+                      <a key={l.id} href={l.url} target="_blank" rel="noreferrer" onClick={() => setOpen(false)}
+                        className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground">
+                        <LinkIcon size={14} className="shrink-0" /> <span className="truncate">{l.title}</span>
+                      </a>
+                    ))}
+                  </div>
+                )}
+                {!isAdmin && studyMaterial.length > 0 && (
+                  <div className="pt-3 mt-2 border-t border-sidebar-border">
+                    <p className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-sidebar-muted flex items-center gap-1.5"><BookOpen size={11}/> Study Material</p>
+                    {studyMaterial.map(l => (
+                      <a key={l.id} href={l.url} target="_blank" rel="noreferrer" onClick={() => setOpen(false)}
+                        className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground">
+                        <BookOpen size={14} className="shrink-0" /> <span className="truncate">{l.title}</span>
+                      </a>
+                    ))}
+                  </div>
+                )}
+                {!isAdmin && (features.toggles.youtube && features.youtubeUrl || features.toggles.downloadApp && features.appDownloadUrl) && (
+                  <div className="pt-3 mt-2 border-t border-sidebar-border space-y-0.5">
+                    {features.toggles.youtube && features.youtubeUrl && (
+                      <a href={features.youtubeUrl} target="_blank" rel="noreferrer" onClick={() => setOpen(false)}
+                        className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-sidebar-foreground/70 hover:bg-sidebar-accent/50">
+                        <Youtube size={14} className="shrink-0" /> YouTube Channel
+                      </a>
+                    )}
+                    {features.toggles.downloadApp && features.appDownloadUrl && (
+                      <a href={features.appDownloadUrl} target="_blank" rel="noreferrer" onClick={() => setOpen(false)}
+                        className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-sidebar-foreground/70 hover:bg-sidebar-accent/50">
+                        <Download size={14} className="shrink-0" /> Download App
+                      </a>
+                    )}
+                  </div>
+                )}
               </nav>
 
               <div className="p-3 border-t border-sidebar-border space-y-2">
