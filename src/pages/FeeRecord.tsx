@@ -7,7 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
-import { Search, IndianRupee, Calendar, CreditCard, StickyNote, CheckCircle2, User } from 'lucide-react';
+import { Search, IndianRupee, Calendar, CreditCard, StickyNote, CheckCircle2, User, Hash, Upload } from 'lucide-react';
 import { generateFeeMessage } from '@/lib/whatsapp';
 import WhatsAppConfirmDialog from '@/components/WhatsAppConfirmDialog';
 
@@ -18,6 +18,9 @@ export default function FeeRecord() {
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [paymentMode, setPaymentMode] = useState<'cash' | 'upi' | 'online'>('cash');
   const [note, setNote] = useState('');
+  const [txnId, setTxnId] = useState('');
+  const [receiptUrl, setReceiptUrl] = useState('');
+  const [receiptName, setReceiptName] = useState('');
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -53,6 +56,7 @@ export default function FeeRecord() {
     if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) e.amount = 'Enter valid amount';
     if (Number(amount) > 500000) e.amount = 'Amount seems too high';
     if (!date) e.date = 'Select date';
+    if (paymentMode !== 'cash' && !txnId.trim()) e.txnId = 'Transaction ID required for UPI/Online';
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -65,10 +69,20 @@ export default function FeeRecord() {
 
     const monthName = new Date(date).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
     const receiptNo = `RCP-${Date.now().toString(36).toUpperCase()}`;
+    const paidAmt = Number(amount);
+    const totalDue = student.feeAmount;
+    const pendingAfter = Math.max(0, totalDue - paidAmt);
 
     student.feeRecords.push({
       id: crypto.randomUUID(), month: monthName, dueDate: date, paidDate: date,
-      amount: Number(amount), lateFee: 0, status: 'paid', paymentMode,
+      amount: totalDue, lateFee: 0,
+      status: pendingAfter === 0 ? 'paid' : 'pending',
+      paymentMode,
+      paidAmount: paidAmt,
+      pendingAmount: pendingAfter,
+      txnId: txnId.trim() || undefined,
+      receiptUrl: receiptUrl || undefined,
+      receiptNo,
     });
 
     if (note.trim()) {
@@ -82,15 +96,24 @@ export default function FeeRecord() {
 
     setLastPayment({
       studentName: student.name, course: student.course,
-      amount: Number(amount), month: monthName,
+      amount: paidAmt, month: monthName,
       phone: student.whatsappNumber || student.mobile,
       receiptNo,
     });
     setShowWhatsApp(true);
 
-    toast.success(`₹${amount} fee recorded for ${student.name}`);
-    setSelectedStudentId(''); setAmount(''); setNote(''); setSearch('');
+    toast.success(`₹${amount} fee recorded for ${student.name}${pendingAfter > 0 ? ` (₹${pendingAfter} pending)` : ' ✓ Fully paid'}`);
+    setSelectedStudentId(''); setAmount(''); setNote(''); setSearch(''); setTxnId(''); setReceiptUrl(''); setReceiptName('');
     setRefreshKey(k => k + 1);
+  };
+
+  const handleReceiptUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) { toast.error('File too large (max 2MB)'); return; }
+    const reader = new FileReader();
+    reader.onload = () => { setReceiptUrl(reader.result as string); setReceiptName(file.name); };
+    reader.readAsDataURL(file);
   };
 
   return (
@@ -204,6 +227,22 @@ export default function FeeRecord() {
             ))}
           </div>
         </div>
+
+        {paymentMode !== 'cash' && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label className="flex items-center gap-1.5"><Hash size={14} /> Transaction / Reference ID</Label>
+              <Input value={txnId} onChange={e => { setTxnId(e.target.value); if (errors.txnId) setErrors(er => { const n = { ...er }; delete n.txnId; return n; }); }}
+                placeholder="e.g. UPI ref / Bank txn ID" className={errors.txnId ? 'border-destructive' : ''} />
+              {errors.txnId && <p className="text-xs text-destructive">{errors.txnId}</p>}
+            </div>
+            <div className="space-y-1.5">
+              <Label className="flex items-center gap-1.5"><Upload size={14} /> Receipt / Screenshot (Optional)</Label>
+              <Input type="file" accept="image/*,application/pdf" onChange={handleReceiptUpload} />
+              {receiptName && <p className="text-xs text-success">✓ {receiptName}</p>}
+            </div>
+          </div>
+        )}
 
         <div className="space-y-1.5">
           <Label className="flex items-center gap-1.5"><StickyNote size={14} /> Note (Optional)</Label>

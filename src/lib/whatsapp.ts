@@ -88,3 +88,59 @@ export function openWhatsApp(number: string, message: string) {
   const url = `https://wa.me/${sanitized}?text=${encoded}`;
   window.open(url, '_blank', 'noopener,noreferrer');
 }
+
+export function generateStudentSummaryMessage(data: {
+  name: string;
+  studentId: string;
+  course: string;
+  paid: number;
+  pending: number;
+  lateFee: number;
+  totalPayable: number;
+}): string {
+  const settings = getSettings();
+  return `📋 *Student Fee Summary*
+
+👤 Name: ${data.name}
+🆔 ID: ${data.studentId}
+📚 Course: ${data.course}
+
+💰 *Payment Status:*
+✅ Paid: ₹${data.paid.toLocaleString()}
+⏳ Pending: ₹${data.pending.toLocaleString()}
+⚠️ Late Fee: ₹${data.lateFee.toLocaleString()}
+💵 Total Payable: ₹${data.totalPayable.toLocaleString()}
+
+कृपया बकाया फीस जल्द से जल्द जमा करें।
+
+धन्यवाद 🙏
+${settings.instituteName}
+${settings.phone ? `📞 ${settings.phone}` : ''}`.trim();
+}
+
+export function shareStudentOnWhatsApp(student: {
+  name: string;
+  studentId: string;
+  course: string;
+  whatsappNumber: string;
+  mobile: string;
+  feeRecords: { amount: number; lateFee: number; status: string; paidAmount?: number; pendingAmount?: number }[];
+}) {
+  let paid = 0, pending = 0, lateFee = 0;
+  student.feeRecords.forEach(f => {
+    const total = (f.amount || 0) + (f.lateFee || 0);
+    if (f.status === 'paid') {
+      paid += f.paidAmount ?? f.amount ?? 0;
+    } else {
+      paid += f.paidAmount ?? 0;
+      pending += f.pendingAmount ?? total - (f.paidAmount ?? 0);
+      lateFee += f.lateFee || 0;
+    }
+  });
+  const totalPayable = pending;
+  const msg = generateStudentSummaryMessage({
+    name: student.name, studentId: student.studentId, course: student.course,
+    paid, pending, lateFee, totalPayable,
+  });
+  openWhatsApp(student.whatsappNumber || student.mobile, msg);
+}

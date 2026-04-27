@@ -26,6 +26,11 @@ export interface FeeRecord {
   lateFee: number;
   status: 'paid' | 'pending' | 'overdue';
   paymentMode?: 'cash' | 'upi' | 'online';
+  txnId?: string;
+  receiptUrl?: string;
+  paidAmount?: number;
+  pendingAmount?: number;
+  receiptNo?: string;
 }
 
 export interface AttendanceRecord {
@@ -117,7 +122,48 @@ export function markFeePaid(studentId: string, feeId: string, paymentMode: 'cash
   fee.paidDate = new Date().toISOString().split('T')[0];
   fee.paymentMode = paymentMode;
   fee.lateFee = 0;
+  fee.paidAmount = (fee.amount || 0);
+  fee.pendingAmount = 0;
   saveStudents(students);
+}
+
+export function recordPayment(
+  studentId: string,
+  feeId: string,
+  paid: number,
+  opts: { paymentMode?: 'cash' | 'upi' | 'online'; txnId?: string; receiptUrl?: string } = {}
+) {
+  const students = getStudents();
+  const student = students.find(s => s.id === studentId);
+  if (!student) return null;
+  const fee = student.feeRecords.find(f => f.id === feeId);
+  if (!fee) return null;
+  const total = (fee.amount || 0) + (fee.lateFee || 0);
+  const prevPaid = fee.paidAmount || 0;
+  const newPaid = Math.min(total, prevPaid + paid);
+  const pending = Math.max(0, total - newPaid);
+  fee.paidAmount = newPaid;
+  fee.pendingAmount = pending;
+  fee.paymentMode = opts.paymentMode || fee.paymentMode || 'cash';
+  if (opts.txnId) fee.txnId = opts.txnId;
+  if (opts.receiptUrl) fee.receiptUrl = opts.receiptUrl;
+  if (pending === 0) {
+    fee.status = 'paid';
+    fee.paidDate = new Date().toISOString().split('T')[0];
+    fee.lateFee = 0;
+    if (!fee.receiptNo) fee.receiptNo = `RCP-${Date.now().toString(36).toUpperCase()}`;
+  }
+  saveStudents(students);
+  return fee;
+}
+
+export function updateStudentPhoto(studentId: string, photoDataUrl: string) {
+  const students = getStudents();
+  const idx = students.findIndex(s => s.id === studentId);
+  if (idx >= 0) {
+    students[idx].photo = photoDataUrl;
+    saveStudents(students);
+  }
 }
 
 export function markAttendance(studentId: string, date: string, status: 'present' | 'absent' | 'late') {

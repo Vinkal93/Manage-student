@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { LayoutDashboard, Users, IndianRupee, MessageSquare, UserPlus, ClipboardList, BarChart3, Send, LogOut, UserCog, Wallet, Activity, Settings, GraduationCap, Calendar, FileText, Database, Sheet, PanelLeftClose, PanelLeft, ToggleRight } from 'lucide-react';
+import { LayoutDashboard, Users, IndianRupee, MessageSquare, UserPlus, ClipboardList, BarChart3, Send, LogOut, UserCog, Wallet, Activity, Settings, GraduationCap, Calendar, FileText, Database, Sheet, PanelLeftClose, PanelLeft, ToggleRight, CalendarDays } from 'lucide-react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { logout } from '@/lib/auth';
 import { getSettings } from '@/lib/settings';
@@ -12,6 +12,7 @@ const adminLinks = [
   { to: '/admin/fees', label: 'Fee Tracking', icon: IndianRupee },
   { to: '/admin/fee-management', label: 'Fee Management', icon: Wallet },
   { to: '/admin/fee-record', label: 'Fee Record', icon: IndianRupee },
+  { to: '/admin/fee-calendar', label: 'Fee Calendar', icon: CalendarDays },
   { to: '/admin/timetable', label: 'Timetable', icon: Calendar },
   { to: '/admin/assignments', label: 'Assignments', icon: FileText },
   { to: '/admin/attendance', label: 'Attendance', icon: ClipboardList },

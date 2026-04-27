@@ -37,6 +37,7 @@ import Backup from "@/pages/Backup";
 import DatabaseSettings from "@/pages/DatabaseSettings";
 import DatabaseGuide from "@/pages/DatabaseGuide";
 import FeeRecord from "@/pages/FeeRecord";
+import FeeCalendar from "@/pages/FeeCalendar";
 import ParentPortal from "@/pages/ParentPortal";
 import StudentTimetable from "@/pages/StudentTimetable";
 import StudentAssignments from "@/pages/StudentAssignments";
@@ -74,8 +75,8 @@ function AdminLayout({ children }: { children: React.ReactNode }) {
 function StudentLayout({ children }: { children: React.ReactNode }) {
   const settings = getSettings();
   return (
-    <div className="min-h-screen">
-      <header className="bg-primary text-primary-foreground px-4 py-3 flex items-center justify-between">
+    <div className="min-h-screen bg-background">
+      <header className="hidden md:flex bg-primary text-primary-foreground px-4 py-3 items-center justify-between sticky top-0 z-30 shadow">
         <div>
           <h1 className="text-lg font-bold">{settings.instituteName}</h1>
           <p className="text-xs opacity-80">Student Panel</p>
@@ -90,7 +91,7 @@ function StudentLayout({ children }: { children: React.ReactNode }) {
           </button>
         </div>
       </header>
-      <main className="p-4 md:p-8 pt-16 md:pt-4 pb-4">
+      <main className="px-4 py-4 md:px-8 md:py-6 pt-16 md:pt-6 pb-24 max-w-5xl mx-auto">
         {children}
         <Footer />
       </main>
@@ -139,6 +140,7 @@ const App = () => (
           <Route path="/admin/database" element={<ProtectedRoute role="admin"><AdminLayout><DatabaseSettings /></AdminLayout></ProtectedRoute>} />
           <Route path="/admin/database/guide/:dbType" element={<ProtectedRoute role="admin"><AdminLayout><DatabaseGuide /></AdminLayout></ProtectedRoute>} />
           <Route path="/admin/fee-record" element={<ProtectedRoute role="admin"><AdminLayout><FeeRecord /></AdminLayout></ProtectedRoute>} />
+          <Route path="/admin/fee-calendar" element={<ProtectedRoute role="admin"><AdminLayout><FeeCalendar /></AdminLayout></ProtectedRoute>} />
           <Route path="/admin/features" element={<ProtectedRoute role="admin"><AdminLayout><FeatureToggles /></AdminLayout></ProtectedRoute>} />
           <Route path="/admin/student/:id" element={<ProtectedRoute role="admin"><AdminLayout><StudentProfile /></AdminLayout></ProtectedRoute>} />
 

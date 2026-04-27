@@ -7,7 +7,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
-import { Settings as SettingsIcon, Building2, Phone, Mail, MapPin, BookOpen, IndianRupee, Plus, X } from 'lucide-react';
+import { Settings as SettingsIcon, Building2, Phone, Mail, MapPin, BookOpen, IndianRupee, Plus, X, Bell } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
 
 export default function Settings() {
   const [settings, setSettings] = useState<InstituteSettings>(getSettings());
@@ -112,6 +113,40 @@ export default function Settings() {
               <Input type="number" value={settings.feeGraceDays} onChange={e => setSettings(s => ({ ...s, feeGraceDays: Number(e.target.value) }))} />
             </div>
           </div>
+        </div>
+
+        {/* FCM Push Notifications */}
+        <div className="bg-card rounded-xl border border-border shadow-sm p-6 space-y-5">
+          <div className="flex items-center justify-between">
+            <h3 className="font-semibold text-foreground flex items-center gap-2"><Bell size={16} /> Push Notifications (Firebase Cloud Messaging)</h3>
+            <Switch
+              checked={!!settings.fcm?.enabled}
+              onCheckedChange={(v) => setSettings(s => ({ ...s, fcm: { ...(s.fcm || { senderId: '', serverKey: '', enabled: false }), enabled: v } }))}
+            />
+          </div>
+          <p className="text-xs text-muted-foreground">FCM keys store करें ताकि fee reminders push notification से भेजे जा सकें।</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Sender ID</Label>
+              <Input
+                value={settings.fcm?.senderId || ''}
+                onChange={e => setSettings(s => ({ ...s, fcm: { ...(s.fcm || { senderId: '', serverKey: '', enabled: false }), senderId: e.target.value } }))}
+                placeholder="123456789012"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Server Key</Label>
+              <Input
+                type="password"
+                value={settings.fcm?.serverKey || ''}
+                onChange={e => setSettings(s => ({ ...s, fcm: { ...(s.fcm || { senderId: '', serverKey: '', enabled: false }), serverKey: e.target.value } }))}
+                placeholder="AAAA..."
+              />
+            </div>
+          </div>
+          {settings.fcm?.enabled && settings.fcm?.serverKey && (
+            <p className="text-xs text-success">✅ Push notifications enabled — fee reminders will be sent to subscribed devices.</p>
+          )}
         </div>
 
         <Button className="w-full" size="lg" onClick={handleSave}>
