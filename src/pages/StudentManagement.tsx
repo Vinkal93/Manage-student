@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getStudents, saveStudents, addStudent, Student } from '@/lib/store';
+import { getStudents, saveStudents, addStudent, Student, updateStudentPhoto } from '@/lib/store';
 import { createStudentFirebaseAccount } from '@/lib/auth';
 import { exportStudentsToExcel, exportToCSV, parseExcelFile } from '@/lib/export';
 import { getSettings } from '@/lib/settings';
@@ -15,8 +15,9 @@ import { toast } from 'sonner';
 import { motion } from 'framer-motion';
 import {
   Search, Eye, Upload, Download, UserCog, Key, Ban, MessageSquare,
-  CheckCircle, FileSpreadsheet, Users, Shield, Edit
+  CheckCircle, FileSpreadsheet, Users, Shield, Edit, Image as ImageIcon, Share2
 } from 'lucide-react';
+import { shareStudentOnWhatsApp } from '@/lib/whatsapp';
 
 export default function StudentManagement() {
   const navigate = useNavigate();
@@ -31,6 +32,8 @@ export default function StudentManagement() {
   const [showMessageDialog, setShowMessageDialog] = useState(false);
   const [newPassword, setNewPassword] = useState('');
   const [importantMessage, setImportantMessage] = useState('');
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const [photoTarget, setPhotoTarget] = useState<Student | null>(null);
 
   const students = useMemo(() => getStudents(), [refreshKey]);
   const courses = [...new Set(students.map(s => s.course))];
@@ -124,6 +127,25 @@ export default function StudentManagement() {
     }
   };
 
+  const triggerPhotoUpload = (s: Student) => {
+    setPhotoTarget(s);
+    setTimeout(() => photoInputRef.current?.click(), 0);
+  };
+
+  const handlePhotoSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || !photoTarget) return;
+    if (file.size > 1.5 * 1024 * 1024) { toast.error('Photo too large (max 1.5MB)'); return; }
+    const reader = new FileReader();
+    reader.onload = () => {
+      updateStudentPhoto(photoTarget.id, reader.result as string);
+      toast.success(`Photo updated for ${photoTarget.name}`);
+      setRefreshKey(k => k + 1);
+    };
+    reader.readAsDataURL(file);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -133,6 +155,7 @@ export default function StudentManagement() {
         </div>
         <div className="flex gap-2 flex-wrap">
           <input ref={fileInputRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleImportExcel} />
+          <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoSelected} />
           <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={() => fileInputRef.current?.click()}>
             <Upload size={14} /> Import Excel
           </Button>
@@ -216,6 +239,12 @@ export default function StudentManagement() {
                     <div className="flex gap-1">
                       <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="View Profile" onClick={() => navigate(`/admin/student/${s.id}`)}>
                         <Eye size={14} />
+                      </Button>
+                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="Upload Photo" onClick={() => triggerPhotoUpload(s)}>
+                        <ImageIcon size={14} className="text-primary" />
+                      </Button>
+                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="Share on WhatsApp" onClick={() => shareStudentOnWhatsApp(s)}>
+                        <Share2 size={14} className="text-success" />
                       </Button>
                       <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="Change Password" onClick={() => { setSelectedStudent(s); setShowPasswordDialog(true); }}>
                         <Key size={14} />
