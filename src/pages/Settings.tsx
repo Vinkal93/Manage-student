@@ -7,7 +7,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
-import { Settings as SettingsIcon, Building2, Phone, Mail, MapPin, BookOpen, IndianRupee, Plus, X } from 'lucide-react';
+import { Settings as SettingsIcon, Building2, Phone, Mail, MapPin, BookOpen, IndianRupee, Plus, X, Bell } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
 
 export default function Settings() {
   const [settings, setSettings] = useState<InstituteSettings>(getSettings());
