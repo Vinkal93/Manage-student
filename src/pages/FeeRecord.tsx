@@ -228,6 +228,22 @@ export default function FeeRecord() {
           </div>
         </div>
 
+        {paymentMode !== 'cash' && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label className="flex items-center gap-1.5"><Hash size={14} /> Transaction / Reference ID</Label>
+              <Input value={txnId} onChange={e => { setTxnId(e.target.value); if (errors.txnId) setErrors(er => { const n = { ...er }; delete n.txnId; return n; }); }}
+                placeholder="e.g. UPI ref / Bank txn ID" className={errors.txnId ? 'border-destructive' : ''} />
+              {errors.txnId && <p className="text-xs text-destructive">{errors.txnId}</p>}
+            </div>
+            <div className="space-y-1.5">
+              <Label className="flex items-center gap-1.5"><Upload size={14} /> Receipt / Screenshot (Optional)</Label>
+              <Input type="file" accept="image/*,application/pdf" onChange={handleReceiptUpload} />
+              {receiptName && <p className="text-xs text-success">✓ {receiptName}</p>}
+            </div>
+          </div>
+        )}
+
         <div className="space-y-1.5">
           <Label className="flex items-center gap-1.5"><StickyNote size={14} /> Note (Optional)</Label>
           <Textarea value={note} onChange={e => setNote(e.target.value)} placeholder="Add a note..." rows={2} maxLength={200} />
