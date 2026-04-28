@@ -1,13 +1,14 @@
-import { useMemo } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { getCurrentUser } from '@/lib/auth';
-import { getStudents } from '@/lib/store';
+import { getStudents, updateStudentPhoto } from '@/lib/store';
 import { getAssignments } from '@/lib/assignments';
 import { getSettings } from '@/lib/settings';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import StatCard from '@/components/StatCard';
 import { motion } from 'framer-motion';
-import { GraduationCap, CreditCard, ClipboardList, MessageSquare, BookOpen, FileText, Bell, Link as LinkIcon, Youtube, Download, QrCode } from 'lucide-react';
+import { GraduationCap, CreditCard, ClipboardList, MessageSquare, BookOpen, FileText, Bell, Link as LinkIcon, Youtube, Download, QrCode, Camera, Trash2 } from 'lucide-react';
+import { toast } from 'sonner';
 import { getFeatures, calcLateFee } from '@/lib/features';
 import { Link } from 'react-router-dom';
 
@@ -15,10 +16,12 @@ export default function StudentDashboard() {
   const user = getCurrentUser();
   const settings = getSettings();
   const features = getFeatures();
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const [photoVer, setPhotoVer] = useState(0);
   const student = useMemo(() => {
     const students = getStudents();
     return students.find(s => s.id === user?.id || s.studentId === user?.studentId);
-  }, [user]);
+  }, [user, photoVer]);
 
   const assignmentMessages = useMemo(() => {
     if (!student) return [];
@@ -46,6 +49,27 @@ export default function StudentDashboard() {
     return <div className="text-center py-20 text-muted-foreground">Student data not found. Please contact admin.</div>;
   }
 
+  const handleUploadPhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (file.size > 1.5 * 1024 * 1024) { toast.error('Photo too large (max 1.5MB)'); return; }
+    const reader = new FileReader();
+    reader.onload = () => {
+      updateStudentPhoto(student.id, reader.result as string);
+      toast.success('Photo updated successfully');
+      setPhotoVer(v => v + 1);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemovePhoto = () => {
+    if (!student.photo) return;
+    updateStudentPhoto(student.id, '');
+    toast.success('Photo removed');
+    setPhotoVer(v => v + 1);
+  };
+
   const presentCount = student.attendance.filter(a => a.status === 'present').length;
   const totalAttendance = student.attendance.length;
   const attendancePercent = totalAttendance > 0 ? Math.round((presentCount / totalAttendance) * 100) : 0;
@@ -60,14 +84,23 @@ export default function StudentDashboard() {
     <div className="space-y-6">
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
         className="flex items-center gap-4 bg-card rounded-xl border border-border p-4">
-        {student.photo ? (
-          <img src={student.photo} alt={student.name}
-            className="w-16 h-16 rounded-full object-cover border-2 border-primary shadow-sm" />
-        ) : (
-          <div className="w-16 h-16 rounded-full bg-primary/10 border-2 border-primary/30 flex items-center justify-center text-xl font-bold text-primary shadow-sm">
-            {student.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
-          </div>
-        )}
+        <div className="relative group">
+          {student.photo ? (
+            <img src={student.photo} alt={student.name}
+              className="w-16 h-16 rounded-full object-cover border-2 border-primary shadow-sm" />
+          ) : (
+            <div className="w-16 h-16 rounded-full bg-primary/10 border-2 border-primary/30 flex items-center justify-center text-xl font-bold text-primary shadow-sm">
+              {student.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+            </div>
+          )}
+          <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={handleUploadPhoto} />
+          <button
+            onClick={() => photoInputRef.current?.click()}
+            title="Change photo"
+            className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow border-2 border-background hover:scale-105 transition">
+            <Camera size={12} />
+          </button>
+        </div>
         <div className="flex-1 min-w-0">
           <h1 className="text-xl sm:text-2xl font-bold text-foreground truncate">Welcome {student.name} 👋</h1>
           <div className="flex flex-wrap gap-1.5 mt-1.5">
@@ -75,6 +108,11 @@ export default function StudentDashboard() {
             <Badge variant="secondary" className="text-[10px]">{student.course}</Badge>
             <Badge variant="outline" className="text-[10px]">Joined {new Date(student.admissionDate).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })}</Badge>
           </div>
+          {student.photo && (
+            <button onClick={handleRemovePhoto} className="text-[10px] text-destructive hover:underline inline-flex items-center gap-1 mt-1">
+              <Trash2 size={10} /> Remove photo
+            </button>
+          )}
         </div>
       </motion.div>
 

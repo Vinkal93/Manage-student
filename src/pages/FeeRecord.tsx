@@ -7,9 +7,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
-import { Search, IndianRupee, Calendar, CreditCard, StickyNote, CheckCircle2, User, Hash, Upload } from 'lucide-react';
+import { Search, IndianRupee, Calendar, CreditCard, StickyNote, CheckCircle2, User, Hash, Upload, FileDown } from 'lucide-react';
 import { generateFeeMessage } from '@/lib/whatsapp';
 import WhatsAppConfirmDialog from '@/components/WhatsAppConfirmDialog';
+import { downloadReceipt, openReceipt } from '@/lib/receipt';
 
 export default function FeeRecord() {
   const [search, setSearch] = useState('');
@@ -45,7 +46,7 @@ export default function FeeRecord() {
   const recentRecords = useMemo(() => {
     return students.flatMap(s =>
       s.feeRecords.filter(f => f.status === 'paid').map(f => ({
-        ...f, studentName: s.name, studentCode: s.studentId, course: s.course,
+        ...f, studentName: s.name, studentCode: s.studentId, course: s.course, _student: s,
       }))
     ).sort((a, b) => new Date(b.paidDate || '').getTime() - new Date(a.paidDate || '').getTime()).slice(0, 10);
   }, [students]);
@@ -102,7 +103,15 @@ export default function FeeRecord() {
     });
     setShowWhatsApp(true);
 
-    toast.success(`₹${amount} fee recorded for ${student.name}${pendingAfter > 0 ? ` (₹${pendingAfter} pending)` : ' ✓ Fully paid'}`);
+    const receiptPayload = {
+      studentName: student.name, studentId: student.studentId, course: student.course,
+      amount: totalDue, paidAmount: paidAmt, pendingAmount: pendingAfter,
+      month: monthName, date, paymentMode, txnId: txnId.trim() || undefined, receiptNo,
+    };
+    toast.success(`₹${amount} recorded for ${student.name}${pendingAfter > 0 ? ` (₹${pendingAfter} pending)` : ' ✓ Fully paid'}`, {
+      action: { label: '⬇ Receipt', onClick: () => downloadReceipt(receiptPayload) },
+      duration: 6000,
+    });
     setSelectedStudentId(''); setAmount(''); setNote(''); setSearch(''); setTxnId(''); setReceiptUrl(''); setReceiptName('');
     setRefreshKey(k => k + 1);
   };
@@ -268,6 +277,7 @@ export default function FeeRecord() {
                 <th className="text-left p-3 font-medium text-muted-foreground">Amount</th>
                 <th className="text-left p-3 font-medium text-muted-foreground hidden sm:table-cell">Mode</th>
                 <th className="text-left p-3 font-medium text-muted-foreground">Date</th>
+                <th className="text-left p-3 font-medium text-muted-foreground">Receipt</th>
               </tr>
             </thead>
             <tbody>
@@ -284,10 +294,34 @@ export default function FeeRecord() {
                   <td className="p-3 text-xs text-muted-foreground">
                     {r.paidDate ? new Date(r.paidDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : '—'}
                   </td>
+                  <td className="p-3">
+                    <div className="flex gap-1">
+                      <Button variant="ghost" size="sm" className="h-7 px-2 text-xs gap-1" title="View receipt"
+                        onClick={() => openReceipt({
+                          studentName: r.studentName, studentId: r.studentCode, course: r.course,
+                          amount: r.amount, paidAmount: r.paidAmount, pendingAmount: r.pendingAmount,
+                          month: r.month, date: r.paidDate || new Date().toISOString().split('T')[0],
+                          paymentMode: r.paymentMode || 'cash', txnId: r.txnId,
+                          receiptNo: r.receiptNo || `RCP-${r.id.slice(0,8).toUpperCase()}`,
+                        })}>
+                        <FileDown size={12} /> View
+                      </Button>
+                      <Button variant="ghost" size="sm" className="h-7 px-2 text-xs gap-1" title="Download"
+                        onClick={() => downloadReceipt({
+                          studentName: r.studentName, studentId: r.studentCode, course: r.course,
+                          amount: r.amount, paidAmount: r.paidAmount, pendingAmount: r.pendingAmount,
+                          month: r.month, date: r.paidDate || new Date().toISOString().split('T')[0],
+                          paymentMode: r.paymentMode || 'cash', txnId: r.txnId,
+                          receiptNo: r.receiptNo || `RCP-${r.id.slice(0,8).toUpperCase()}`,
+                        })}>
+                        ⬇
+                      </Button>
+                    </div>
+                  </td>
                 </tr>
               ))}
               {recentRecords.length === 0 && (
-                <tr><td colSpan={4} className="p-6 text-center text-muted-foreground">No recent payments</td></tr>
+                <tr><td colSpan={5} className="p-6 text-center text-muted-foreground">No recent payments</td></tr>
               )}
             </tbody>
           </table>

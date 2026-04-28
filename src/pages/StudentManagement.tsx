@@ -17,7 +17,10 @@ import {
   Search, Eye, Upload, Download, UserCog, Key, Ban, MessageSquare,
   CheckCircle, FileSpreadsheet, Users, Shield, Edit, Image as ImageIcon, Share2
 } from 'lucide-react';
-import { shareStudentOnWhatsApp } from '@/lib/whatsapp';
+import { buildStudentSummary } from '@/lib/whatsapp';
+import WhatsAppConfirmDialog from '@/components/WhatsAppConfirmDialog';
+import { updateStudentPhoto as updPhoto } from '@/lib/store';
+import { Trash2 } from 'lucide-react';
 
 export default function StudentManagement() {
   const navigate = useNavigate();
@@ -34,6 +37,7 @@ export default function StudentManagement() {
   const [importantMessage, setImportantMessage] = useState('');
   const photoInputRef = useRef<HTMLInputElement>(null);
   const [photoTarget, setPhotoTarget] = useState<Student | null>(null);
+  const [shareTarget, setShareTarget] = useState<Student | null>(null);
 
   const students = useMemo(() => getStudents(), [refreshKey]);
   const courses = [...new Set(students.map(s => s.course))];
@@ -146,6 +150,13 @@ export default function StudentManagement() {
     reader.readAsDataURL(file);
   };
 
+  const removePhoto = (s: Student) => {
+    if (!s.photo) { toast.info('No photo to remove'); return; }
+    updPhoto(s.id, '');
+    toast.success(`Photo removed for ${s.name}`);
+    setRefreshKey(k => k + 1);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -243,7 +254,12 @@ export default function StudentManagement() {
                       <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="Upload Photo" onClick={() => triggerPhotoUpload(s)}>
                         <ImageIcon size={14} className="text-primary" />
                       </Button>
-                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="Share on WhatsApp" onClick={() => shareStudentOnWhatsApp(s)}>
+                      {s.photo && (
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="Remove Photo" onClick={() => removePhoto(s)}>
+                          <Trash2 size={14} className="text-destructive" />
+                        </Button>
+                      )}
+                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="Share on WhatsApp" onClick={() => setShareTarget(s)}>
                         <Share2 size={14} className="text-success" />
                       </Button>
                       <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="Change Password" onClick={() => { setSelectedStudent(s); setShowPasswordDialog(true); }}>
@@ -308,6 +324,27 @@ export default function StudentManagement() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {shareTarget && (() => {
+        const { phone, message, data } = buildStudentSummary(shareTarget);
+        return (
+          <WhatsAppConfirmDialog
+            open={!!shareTarget}
+            onClose={() => setShareTarget(null)}
+            title={`Share ${shareTarget.name}`}
+            subtitle="Review the encoded message before sending on WhatsApp"
+            phoneNumber={phone}
+            message={message}
+            details={[
+              { label: 'Student', value: `${shareTarget.name} (${shareTarget.studentId})` },
+              { label: 'Course', value: shareTarget.course },
+              { label: 'Paid', value: `₹${data.paid.toLocaleString()}` },
+              { label: 'Pending', value: `₹${data.pending.toLocaleString()}` },
+              { label: 'Late Fee', value: `₹${data.lateFee.toLocaleString()}` },
+            ]}
+          />
+        );
+      })()}
     </div>
   );
 }

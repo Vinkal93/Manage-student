@@ -12,7 +12,7 @@ import { Lock, User, GraduationCap, Shield, ArrowLeft } from 'lucide-react';
 export default function Login() {
   const navigate = useNavigate();
   const settings = getSettings();
-  const [mode, setMode] = useState<'admin' | 'student'>('admin');
+  const [mode, setMode] = useState<'admin' | 'student'>('student');
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);

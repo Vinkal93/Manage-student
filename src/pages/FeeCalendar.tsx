@@ -16,6 +16,8 @@ export default function FeeCalendar() {
   const [year, setYear] = useState(today.getFullYear());
   const [selectedDate, setSelectedDate] = useState<string>(today.toISOString().split('T')[0]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [multiDates, setMultiDates] = useState<Set<string>>(new Set());
+  const [multiMode, setMultiMode] = useState(false);
 
   const students = useMemo(() => getStudents(), []);
 
@@ -51,6 +53,31 @@ export default function FeeCalendar() {
     setMonth(d.getMonth()); setYear(d.getFullYear());
   };
 
+  const toggleDate = (dateStr: string) => {
+    if (multiMode) {
+      setMultiDates(prev => { const n = new Set(prev); n.has(dateStr) ? n.delete(dateStr) : n.add(dateStr); return n; });
+    } else {
+      setSelectedDate(dateStr); setSelected(new Set());
+    }
+  };
+
+  const sendMultiDateReminders = () => {
+    if (multiDates.size === 0) { toast.error('Select at least one date'); return; }
+    let count = 0;
+    let delay = 0;
+    multiDates.forEach(dateStr => {
+      const list = dueByDate.get(dateStr) || [];
+      list.forEach(it => {
+        const msg = `🔔 *Fee Reminder*\n\nप्रिय ${it.name},\n${settings.instituteName} में आपकी फीस ₹${it.amount.toLocaleString()} ${new Date(dateStr).toLocaleDateString('en-IN')} को due थी।\nकृपया जल्द से जल्द जमा करें।\n\nधन्यवाद 🙏`;
+        setTimeout(() => openWhatsApp(it.whatsapp, msg), delay);
+        delay += 600; count++;
+      });
+    });
+    if (count === 0) { toast.error('Selected dates have no pending fees'); return; }
+    toast.success(`Triggering ${count} WhatsApp reminder(s) across ${multiDates.size} date(s)…`);
+    setMultiDates(new Set());
+  };
+
   const toggle = (id: string) => {
     setSelected(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
   };
@@ -73,6 +100,20 @@ export default function FeeCalendar() {
         <p className="text-muted-foreground text-sm mt-1">Daily pending fees aur manual reminder trigger</p>
       </div>
 
+      <div className="flex flex-wrap items-center gap-2 bg-card border border-border rounded-xl p-3">
+        <Button size="sm" variant={multiMode ? 'default' : 'outline'} onClick={() => { setMultiMode(m => !m); setMultiDates(new Set()); }} className="gap-1.5">
+          <CalIcon size={14} /> {multiMode ? 'Exit Multi-Select' : 'Select Multiple Dates'}
+        </Button>
+        {multiMode && (
+          <>
+            <Badge variant="secondary">{multiDates.size} date(s) selected</Badge>
+            <Button size="sm" className="gap-1.5" disabled={multiDates.size === 0} onClick={sendMultiDateReminders}>
+              <Send size={14} /> Trigger Reminders Now
+            </Button>
+          </>
+        )}
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
           className="bg-card rounded-xl border border-border shadow-sm p-4">
@@ -89,10 +130,10 @@ export default function FeeCalendar() {
               if (d === null) return <div key={i} />;
               const dateStr = getDateStr(d);
               const due = dueByDate.get(dateStr) || [];
-              const isSelected = selectedDate === dateStr;
+              const isSelected = multiMode ? multiDates.has(dateStr) : selectedDate === dateStr;
               const totalAmt = due.reduce((a, b) => a + b.amount, 0);
               return (
-                <button key={i} onClick={() => { setSelectedDate(dateStr); setSelected(new Set()); }}
+                <button key={i} onClick={() => toggleDate(dateStr)}
                   className={`aspect-square rounded-lg text-xs flex flex-col items-center justify-center transition-all border ${
                     isSelected ? 'bg-primary text-primary-foreground border-primary' :
                     due.length > 0 ? 'bg-destructive/10 border-destructive/30 text-foreground hover:bg-destructive/20' :

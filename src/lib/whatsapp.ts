@@ -118,14 +118,14 @@ ${settings.instituteName}
 ${settings.phone ? `📞 ${settings.phone}` : ''}`.trim();
 }
 
-export function shareStudentOnWhatsApp(student: {
+export function buildStudentSummary(student: {
   name: string;
   studentId: string;
   course: string;
   whatsappNumber: string;
   mobile: string;
   feeRecords: { amount: number; lateFee: number; status: string; paidAmount?: number; pendingAmount?: number }[];
-}) {
+}): { phone: string; message: string; data: { paid: number; pending: number; lateFee: number; totalPayable: number } } {
   let paid = 0, pending = 0, lateFee = 0;
   student.feeRecords.forEach(f => {
     const total = (f.amount || 0) + (f.lateFee || 0);
@@ -138,9 +138,18 @@ export function shareStudentOnWhatsApp(student: {
     }
   });
   const totalPayable = pending;
-  const msg = generateStudentSummaryMessage({
+  const message = generateStudentSummaryMessage({
     name: student.name, studentId: student.studentId, course: student.course,
     paid, pending, lateFee, totalPayable,
   });
-  openWhatsApp(student.whatsappNumber || student.mobile, msg);
+  return {
+    phone: student.whatsappNumber || student.mobile,
+    message,
+    data: { paid, pending, lateFee, totalPayable },
+  };
+}
+
+export function shareStudentOnWhatsApp(student: Parameters<typeof buildStudentSummary>[0]) {
+  const { phone, message } = buildStudentSummary(student);
+  openWhatsApp(phone, message);
 }
