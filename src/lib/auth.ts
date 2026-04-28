@@ -6,7 +6,7 @@ import {
   onAuthStateChanged,
   User as FirebaseUser,
 } from 'firebase/auth';
-import { fbIsAdmin, fbSetAdmin, fbLogSession } from './firebaseStore';
+import { fbIsAdmin, fbSetAdmin, fbLogSession, fbUpdateSession } from './firebaseStore';
 
 export type UserRole = 'admin' | 'student';
 
@@ -19,6 +19,17 @@ export interface AuthUser {
 }
 
 const AUTH_KEY = 'sbci_auth';
+
+// In-memory admin credentials for re-auth after student creation
+// NEVER persisted to storage — only lives in RAM
+let _adminEmail: string | null = null;
+let _adminPassword: string | null = null;
+
+// Current session Firebase key for live updates
+let _currentSessionKey: string | null = null;
+
+// Heartbeat interval reference
+let _heartbeatInterval: ReturnType<typeof setInterval> | null = null;
 
 // Convert student ID to Firebase Auth email
 export function studentIdToEmail(studentId: string): string {
@@ -38,6 +49,10 @@ export async function loginWithFirebase(identifier: string, password: string): P
     const cred = await signInWithEmailAndPassword(auth, email, password);
 
     if (isAdmin) {
+      // Store admin credentials in memory for re-auth after student creation
+      _adminEmail = identifier;
+      _adminPassword = password;
+
       // Check if this user is an admin in Realtime DB
       const isAdminUser = await fbIsAdmin(cred.user.uid);
       
@@ -54,6 +69,7 @@ export async function loginWithFirebase(identifier: string, password: string): P
       };
       localStorage.setItem(AUTH_KEY, JSON.stringify(user));
       await logSessionToFirebase(user);
+      startHeartbeat();
       return user;
     } else {
       // Student login
@@ -65,6 +81,7 @@ export async function loginWithFirebase(identifier: string, password: string): P
       };
       localStorage.setItem(AUTH_KEY, JSON.stringify(user));
       await logSessionToFirebase(user);
+      startHeartbeat();
       return user;
     }
   } catch (err: any) {
@@ -76,17 +93,44 @@ export async function loginWithFirebase(identifier: string, password: string): P
 /**
  * Create Firebase Auth account for student
  * Called when admin adds a new student
+ * Returns the Firebase UID of the created student
  */
-export async function createStudentFirebaseAccount(studentId: string, password: string): Promise<boolean> {
+export async function createStudentFirebaseAccount(studentId: string, password: string): Promise<{ success: boolean; uid?: string }> {
   try {
     const email = studentIdToEmail(studentId);
-    await createUserWithEmailAndPassword(auth, email, password);
-    // Sign back in as admin (creating user signs in as the new user)
-    // We'll handle re-auth in the calling code
-    return true;
+    const cred = await createUserWithEmailAndPassword(auth, email, password);
+    const studentUid = cred.user.uid;
+
+    // Creating a user auto-signs in as that user — re-auth as admin
+    await reAuthenticateAdmin();
+
+    return { success: true, uid: studentUid };
   } catch (err: any) {
     console.error('Create student account error:', err.code, err.message);
-    if (err.code === 'auth/email-already-in-use') return true;
+    if (err.code === 'auth/email-already-in-use') {
+      // Account already exists, that's fine
+      // Try to re-auth as admin in case we got signed out
+      await reAuthenticateAdmin();
+      return { success: true };
+    }
+    return { success: false };
+  }
+}
+
+/**
+ * Re-authenticate as admin after student creation
+ * Uses in-memory cached credentials (never persisted)
+ */
+async function reAuthenticateAdmin(): Promise<boolean> {
+  if (!_adminEmail || !_adminPassword) {
+    console.warn('No admin credentials cached for re-auth');
+    return false;
+  }
+  try {
+    await signInWithEmailAndPassword(auth, _adminEmail, _adminPassword);
+    return true;
+  } catch (e) {
+    console.error('Admin re-auth failed:', e);
     return false;
   }
 }
@@ -95,12 +139,25 @@ export async function createStudentFirebaseAccount(studentId: string, password: 
  * Logout from Firebase
  */
 export async function logoutFirebase() {
+  // Mark session as ended
+  if (_currentSessionKey) {
+    await fbUpdateSession(_currentSessionKey, {
+      isActive: false,
+      logoutTime: new Date().toISOString(),
+    });
+  }
+  stopHeartbeat();
+  _currentSessionKey = null;
+  _adminEmail = null;
+  _adminPassword = null;
+
   try {
     await signOut(auth);
   } catch (e) {
     console.error('Logout error:', e);
   }
   localStorage.removeItem(AUTH_KEY);
+  localStorage.removeItem('sbci_current_session');
 }
 
 export function logout() {
@@ -145,7 +202,7 @@ async function logSessionToFirebase(user: AuthUser) {
     language: navigator.language,
     isActive: true,
     lastActivity: new Date().toISOString(),
-    currentPage: '/',
+    currentPage: window.location.pathname || '/',
   };
 
   // Save to localStorage
@@ -155,10 +212,13 @@ async function logSessionToFirebase(user: AuthUser) {
   localStorage.setItem('sbci_sessions', JSON.stringify(sessions));
   localStorage.setItem('sbci_current_session', JSON.stringify(session));
 
-  // Save to Firebase
-  await fbLogSession(session);
+  // Save to Firebase and get the key
+  _currentSessionKey = await fbLogSession(session);
 }
 
+/**
+ * Update session activity — both localStorage and Firebase
+ */
 export function updateSessionActivity(page: string) {
   const session = JSON.parse(localStorage.getItem('sbci_current_session') || 'null');
   if (session) {
@@ -169,6 +229,39 @@ export function updateSessionActivity(page: string) {
     const idx = sessions.findIndex((s: any) => s.id === session.id);
     if (idx >= 0) sessions[idx] = session;
     localStorage.setItem('sbci_sessions', JSON.stringify(sessions));
+
+    // Sync to Firebase
+    if (_currentSessionKey) {
+      fbUpdateSession(_currentSessionKey, {
+        lastActivity: session.lastActivity,
+        currentPage: page,
+        isActive: true,
+      }).catch(() => {});
+    }
+  }
+}
+
+/**
+ * Heartbeat — sends activity ping every 30s to Firebase
+ * This enables live user tracking in admin analytics
+ */
+function startHeartbeat() {
+  stopHeartbeat();
+  _heartbeatInterval = setInterval(() => {
+    if (_currentSessionKey) {
+      fbUpdateSession(_currentSessionKey, {
+        lastActivity: new Date().toISOString(),
+        isActive: true,
+        currentPage: window.location.pathname,
+      }).catch(() => {});
+    }
+  }, 30000); // every 30 seconds
+}
+
+function stopHeartbeat() {
+  if (_heartbeatInterval) {
+    clearInterval(_heartbeatInterval);
+    _heartbeatInterval = null;
   }
 }
 

@@ -1,22 +1,98 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { useMemo, useState } from 'react';
-import { getStudents, markFeePaid } from '@/lib/store';
+import { getStudents, markFeePaid, updateStudentFull, deleteStudent, updateStudentPhoto } from '@/lib/store';
+import { getSettings } from '@/lib/settings';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import { ArrowLeft, Phone, GraduationCap, Calendar, CreditCard, ClipboardList, MessageSquare, User } from 'lucide-react';
+import { ArrowLeft, Phone, GraduationCap, Calendar, CreditCard, ClipboardList, MessageSquare, User, Pencil, Trash2, Camera, Key, Power } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export default function StudentProfile() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const settings = getSettings();
   const [refreshKey, setRefreshKey] = useState(0);
+  const [editOpen, setEditOpen] = useState(false);
 
   const student = useMemo(() => {
     return getStudents().find(s => s.id === id);
   }, [id, refreshKey]);
+
+  // Edit form state
+  const [editForm, setEditForm] = useState({
+    name: '', fatherName: '', mobile: '', whatsappNumber: '', course: '', feeAmount: 0, status: 'active' as 'active' | 'stopped', password: '',
+  });
+
+  const openEdit = () => {
+    if (!student) return;
+    setEditForm({
+      name: student.name,
+      fatherName: student.fatherName,
+      mobile: student.mobile,
+      whatsappNumber: student.whatsappNumber,
+      course: student.course,
+      feeAmount: student.feeAmount,
+      status: student.status,
+      password: student.password || '',
+    });
+    setEditOpen(true);
+  };
+
+  const handleSaveEdit = () => {
+    if (!student) return;
+    updateStudentFull(student.id, {
+      name: editForm.name.trim(),
+      fatherName: editForm.fatherName.trim(),
+      mobile: editForm.mobile.trim(),
+      whatsappNumber: editForm.whatsappNumber.trim(),
+      course: editForm.course,
+      feeAmount: editForm.feeAmount,
+      status: editForm.status,
+      password: editForm.password || student.password,
+    });
+    toast.success('Student info updated! ✅');
+    setEditOpen(false);
+    setRefreshKey(k => k + 1);
+  };
+
+  const handleDelete = () => {
+    if (!student) return;
+    const success = deleteStudent(student.id);
+    if (success) {
+      toast.success(`${student.name} has been deleted`);
+      navigate('/admin/students');
+    } else {
+      toast.error('Failed to delete student');
+    }
+  };
+
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !student) return;
+    if (file.size > 2 * 1024 * 1024) { toast.error('Image too large (max 2MB)'); return; }
+    const reader = new FileReader();
+    reader.onload = () => {
+      updateStudentPhoto(student.id, reader.result as string);
+      toast.success('Photo updated!');
+      setRefreshKey(k => k + 1);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleToggleStatus = () => {
+    if (!student) return;
+    const newStatus = student.status === 'active' ? 'stopped' : 'active';
+    updateStudentFull(student.id, { status: newStatus });
+    toast.success(`Student ${newStatus === 'active' ? 'activated' : 'stopped'}`);
+    setRefreshKey(k => k + 1);
+  };
 
   if (!student) {
     return (
@@ -41,9 +117,105 @@ export default function StudentProfile() {
 
   return (
     <div className="space-y-6">
-      <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="gap-2">
-        <ArrowLeft size={16} /> Back
-      </Button>
+      <div className="flex items-center justify-between">
+        <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="gap-2">
+          <ArrowLeft size={16} /> Back
+        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" className="gap-1.5" onClick={openEdit}>
+            <Pencil size={14} /> Edit
+          </Button>
+          <Button variant="outline" size="sm" className="gap-1.5" onClick={handleToggleStatus}>
+            <Power size={14} /> {student.status === 'active' ? 'Stop' : 'Activate'}
+          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="destructive" size="sm" className="gap-1.5">
+                <Trash2 size={14} /> Delete
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete Student?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Are you sure you want to delete <strong>{student.name}</strong> ({student.studentId})?
+                  This action cannot be undone. All data including fee records, attendance, and messages will be permanently deleted.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                  Yes, Delete
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
+      </div>
+
+      {/* Edit Dialog */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Student — {student.studentId}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="space-y-1.5">
+              <Label>Student Name</Label>
+              <Input value={editForm.name} onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Father's Name</Label>
+              <Input value={editForm.fatherName} onChange={e => setEditForm(f => ({ ...f, fatherName: e.target.value }))} />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label>Mobile</Label>
+                <Input value={editForm.mobile} onChange={e => setEditForm(f => ({ ...f, mobile: e.target.value.replace(/\D/g, '').slice(0, 10) }))} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>WhatsApp</Label>
+                <Input value={editForm.whatsappNumber} onChange={e => setEditForm(f => ({ ...f, whatsappNumber: e.target.value.replace(/\D/g, '').slice(0, 10) }))} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label>Course</Label>
+                <Select value={editForm.course} onValueChange={v => setEditForm(f => ({ ...f, course: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {settings.courses.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Monthly Fee (₹)</Label>
+                <Input type="number" value={editForm.feeAmount} onChange={e => setEditForm(f => ({ ...f, feeAmount: Number(e.target.value) }))} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label>Status</Label>
+                <Select value={editForm.status} onValueChange={(v: 'active' | 'stopped') => setEditForm(f => ({ ...f, status: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="stopped">Stopped</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Password</Label>
+                <Input value={editForm.password} onChange={e => setEditForm(f => ({ ...f, password: e.target.value }))} placeholder="Change password" />
+              </div>
+            </div>
+            <div className="flex gap-3 pt-2">
+              <Button variant="outline" className="flex-1" onClick={() => setEditOpen(false)}>Cancel</Button>
+              <Button className="flex-1" onClick={handleSaveEdit}>Save Changes</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Profile Header */}
       <motion.div
@@ -52,8 +224,18 @@ export default function StudentProfile() {
         className="bg-card rounded-xl border border-border shadow-sm p-6"
       >
         <div className="flex flex-col sm:flex-row gap-6 items-start">
-          <div className="w-20 h-20 rounded-2xl bg-primary/10 flex items-center justify-center shrink-0">
-            <User className="text-primary" size={36} />
+          <div className="relative group">
+            {student.photo ? (
+              <img src={student.photo} alt={student.name} className="w-20 h-20 rounded-2xl object-cover border-2 border-primary/30" />
+            ) : (
+              <div className="w-20 h-20 rounded-2xl bg-primary/10 flex items-center justify-center shrink-0">
+                <User className="text-primary" size={36} />
+              </div>
+            )}
+            <label className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-2xl opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity">
+              <Camera size={20} className="text-white" />
+              <input type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} />
+            </label>
           </div>
           <div className="flex-1 space-y-3">
             <div>
@@ -71,6 +253,7 @@ export default function StudentProfile() {
               <span className="flex items-center gap-1"><Phone size={12} /> {student.mobile}</span>
               <span className="flex items-center gap-1"><Calendar size={12} /> Joined {new Date(student.admissionDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
               <span className="flex items-center gap-1"><CreditCard size={12} /> ₹{student.feeAmount}/month</span>
+              <span className="flex items-center gap-1"><Key size={12} /> {student.password}</span>
             </div>
           </div>
           <div className="flex gap-3 text-center">

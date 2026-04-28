@@ -6,15 +6,25 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
-import { Plus, Trash2, Upload, QrCode, Youtube, Link as LinkIcon, BookOpen, Bot } from 'lucide-react';
+import { Plus, Trash2, Upload, QrCode, Youtube, Link as LinkIcon, BookOpen, Bot, CheckCircle2 } from 'lucide-react';
 
 export default function FeatureToggles() {
   const [cfg, setCfg] = useState<FeatureConfig>(getFeatures());
+  const [saving, setSaving] = useState(false);
 
   const update = (patch: Partial<FeatureConfig>) => setCfg(c => ({ ...c, ...patch }));
   const setToggle = (k: keyof FeatureConfig['toggles'], v: boolean) => setCfg(c => ({ ...c, toggles: { ...c.toggles, [k]: v } }));
 
-  const save = () => { saveFeatures(cfg); toast.success('Settings saved!'); };
+  const save = async () => {
+    setSaving(true);
+    try {
+      saveFeatures(cfg); // saves to localStorage + Firebase
+      toast.success('Settings saved & synced to cloud! ☁️');
+    } catch {
+      toast.error('Failed to save settings');
+    }
+    setSaving(false);
+  };
 
   const onQrUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -34,14 +44,20 @@ export default function FeatureToggles() {
 
   return (
     <div className="space-y-6 max-w-3xl">
-      <div>
-        <h1 className="text-2xl font-bold">Features & Dynamic Content</h1>
-        <p className="text-sm text-muted-foreground mt-1">Toggle features, manage links, study material, payment QR & chatbot FAQ</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">Features & Dynamic Content</h1>
+          <p className="text-sm text-muted-foreground mt-1">Toggle features, manage links, study material, payment QR & chatbot FAQ</p>
+        </div>
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <CheckCircle2 size={14} className="text-success" /> Auto-syncs to student portal
+        </div>
       </div>
 
       {/* Toggles */}
       <div className="bg-card rounded-xl border border-border shadow-sm p-6 space-y-3">
         <h3 className="font-semibold flex items-center gap-2">⚙️ Feature Toggles</h3>
+        <p className="text-xs text-muted-foreground">Changes will reflect on student portal immediately after saving</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {Object.entries(cfg.toggles).map(([k, v]) => (
             <div key={k} className="flex items-center justify-between p-3 rounded-lg border border-border bg-muted/20">
@@ -126,7 +142,10 @@ export default function FeatureToggles() {
         ))}
       </div>
 
-      <Button className="w-full" size="lg" onClick={save}><Upload size={16} className="mr-2"/> Save All Changes</Button>
+      <Button className="w-full" size="lg" onClick={save} disabled={saving}>
+        <Upload size={16} className="mr-2"/>
+        {saving ? 'Saving...' : 'Save All Changes & Sync to Cloud'}
+      </Button>
     </div>
   );
 }

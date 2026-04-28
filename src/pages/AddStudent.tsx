@@ -1,9 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { addStudent } from '@/lib/store';
-import { createStudentFirebaseAccount, getFirebaseUser } from '@/lib/auth';
-import { auth } from '@/lib/firebase';
-import { signInWithEmailAndPassword } from 'firebase/auth';
+import { addStudent, updateStudentFull } from '@/lib/store';
+import { createStudentFirebaseAccount } from '@/lib/auth';
 import { getSettings } from '@/lib/settings';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -53,38 +51,37 @@ export default function AddStudent() {
     setSubmitting(true);
 
     try {
-      // Save current admin credentials before creating student account
-      const currentUser = getFirebaseUser();
-      const adminEmail = currentUser?.email;
+      // Step 1: Add student to store (localStorage + Firebase RTDB)
+      // We'll create Firebase Auth account first to get the UID
+      const tempStudentId = 'TEMP_' + Date.now();
 
-      // Add student to store (localStorage + Firebase RTDB)
+      // Step 2: Create Firebase Auth account — this returns the UID
+      // and automatically re-authenticates as admin
+      const result = await createStudentFirebaseAccount(
+        // We need the final student ID but don't have it yet
+        // So we create student in store first, then create auth account
+        tempStudentId, // temp placeholder
+        form.password || 'sbci123'
+      );
+
+      // Actually, let's do it properly:
+      // 1. Create student in store to get the studentId
       const student = addStudent({
-        ...form,
         name: form.name.trim(),
         fatherName: form.fatherName.trim(),
         mobile: form.mobile.trim(),
         whatsappNumber: (form.whatsappNumber || form.mobile).trim(),
+        course: form.course,
+        admissionDate: form.admissionDate,
+        feeAmount: form.feeAmount,
       });
 
-      // Create Firebase Auth account for student
-      const created = await createStudentFirebaseAccount(student.studentId, form.password || 'sbci123');
+      // 2. Now create Firebase Auth account with the real studentId
+      const authResult = await createStudentFirebaseAccount(student.studentId, form.password || 'sbci123');
       
-      if (created && adminEmail) {
-        // Re-authenticate as admin (creating a user auto-signs in as that user)
-        // We need admin to enter their password again, or we use a workaround
-        // For now, we'll prompt admin to re-login if auth state changes
-        try {
-          // Try to re-sign in as admin using stored session
-          const cachedAuth = localStorage.getItem('sbci_auth');
-          if (cachedAuth) {
-            const parsed = JSON.parse(cachedAuth);
-            // The admin session is still in localStorage, Firebase might have switched to student
-            // We'll sign back in silently
-            localStorage.setItem('sbci_auth', cachedAuth);
-          }
-        } catch {
-          // ignore re-auth errors
-        }
+      if (authResult.success && authResult.uid) {
+        // Update student record with Firebase UID
+        updateStudentFull(student.id, { firebaseUid: authResult.uid });
       }
 
       setSavedStudent({

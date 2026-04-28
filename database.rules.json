@@ -14,7 +14,8 @@
     },
     "sessions": {
       ".read": "auth != null",
-      ".write": "auth != null"
+      ".write": "auth != null",
+      ".indexOn": ["loginTime", "userId", "isActive"]
     },
     "fcmTokens": {
       ".read": "auth != null",
@@ -29,6 +30,10 @@
       ".write": "auth != null"
     },
     "features": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "sidebarConfig": {
       ".read": "auth != null",
       ".write": "auth != null"
     },

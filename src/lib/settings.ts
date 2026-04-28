@@ -14,7 +14,6 @@ export interface InstituteSettings {
   feeGraceDays: number;
   fcm?: {
     senderId: string;
-    serverKey: string;
     enabled: boolean;
   };
 }
@@ -30,7 +29,7 @@ const defaultSettings: InstituteSettings = {
   lateFeeAmount: 50,
   feeDueDate: 10,
   feeGraceDays: 5,
-  fcm: { senderId: '', serverKey: '', enabled: false },
+  fcm: { senderId: '', enabled: false },
 };
 
 export function getSettings(): InstituteSettings {

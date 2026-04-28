@@ -1,40 +1,73 @@
 import { useState, useEffect } from 'react';
-import { Navigate } from 'react-router-dom';
-import { getCurrentUser, onAuthChange } from '@/lib/auth';
+import { Navigate, useLocation } from 'react-router-dom';
+import { getCurrentUser, onAuthChange, updateSessionActivity } from '@/lib/auth';
 import { Loader2 } from 'lucide-react';
 
 export function ProtectedRoute({ children, role }: { children: React.ReactNode; role?: 'admin' | 'student' }) {
   const [loading, setLoading] = useState(true);
   const [authenticated, setAuthenticated] = useState(false);
+  const location = useLocation();
 
   useEffect(() => {
+    let resolved = false;
+
     // Check localStorage first for quick response
     const cachedUser = getCurrentUser();
     if (cachedUser) {
       setAuthenticated(true);
       setLoading(false);
-      return;
+      resolved = true;
+      // Track page activity
+      updateSessionActivity(location.pathname);
     }
 
-    // Listen to Firebase auth state
+    // Listen to Firebase auth state for verification
     const unsub = onAuthChange((firebaseUser) => {
       if (firebaseUser) {
+        // Firebase confirms we're authenticated
         const user = getCurrentUser();
-        setAuthenticated(!!user);
+        if (user) {
+          setAuthenticated(true);
+        } else {
+          // Firebase says authenticated but no localStorage cache
+          // This can happen on refresh — wait a bit
+          setAuthenticated(false);
+        }
       } else {
-        setAuthenticated(false);
+        // Only set unauthenticated if we didn't have a cached user
+        if (!resolved) {
+          setAuthenticated(false);
+        }
       }
-      setLoading(false);
+      if (!resolved) {
+        setLoading(false);
+        resolved = true;
+      }
     });
 
-    // Timeout fallback
-    const timeout = setTimeout(() => setLoading(false), 2000);
+    // Timeout fallback — don't block the user forever
+    const timeout = setTimeout(() => {
+      if (!resolved) {
+        resolved = true;
+        // If we have cached user, trust it
+        const user = getCurrentUser();
+        setAuthenticated(!!user);
+        setLoading(false);
+      }
+    }, 3000);
 
     return () => {
       unsub();
       clearTimeout(timeout);
     };
-  }, []);
+  }, [location.pathname]);
+
+  // Track page changes for analytics
+  useEffect(() => {
+    if (authenticated) {
+      updateSessionActivity(location.pathname);
+    }
+  }, [location.pathname, authenticated]);
 
   if (loading) {
     return (

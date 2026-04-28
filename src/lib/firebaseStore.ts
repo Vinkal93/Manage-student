@@ -3,7 +3,7 @@
  * All CRUD operations for students, settings, sessions, etc.
  */
 import { rtdb } from './firebase';
-import { ref, get, set, push, update, remove, onValue, off, DataSnapshot } from 'firebase/database';
+import { ref, get, set, push, update, remove, onValue, off, DataSnapshot, query, orderByChild, limitToLast } from 'firebase/database';
 import type { Student, FeeRecord, AttendanceRecord, MessageRecord } from './store';
 
 // ─── STUDENTS ────────────────────────────────────────────
@@ -109,11 +109,23 @@ export async function fbSetAdmin(uid: string, email: string): Promise<void> {
 
 // ─── SESSIONS ────────────────────────────────────────────
 
-export async function fbLogSession(session: any): Promise<void> {
+export async function fbLogSession(session: any): Promise<string | null> {
   try {
-    await push(ref(rtdb, 'sessions'), session);
+    const newRef = push(ref(rtdb, 'sessions'));
+    await set(newRef, { ...session, _key: newRef.key });
+    return newRef.key;
   } catch (e) {
     console.error('fbLogSession error:', e);
+    return null;
+  }
+}
+
+export async function fbUpdateSession(sessionKey: string, updates: any): Promise<void> {
+  try {
+    if (!sessionKey) return;
+    await update(ref(rtdb, `sessions/${sessionKey}`), updates);
+  } catch (e) {
+    console.error('fbUpdateSession error:', e);
   }
 }
 
@@ -127,6 +139,18 @@ export async function fbGetSessions(): Promise<any[]> {
     console.error('fbGetSessions error:', e);
     return [];
   }
+}
+
+// Realtime sessions listener
+export function fbOnSessionsChange(callback: (sessions: any[]) => void): () => void {
+  const sessionsRef = ref(rtdb, 'sessions');
+  const handler = (snap: DataSnapshot) => {
+    if (!snap.exists()) { callback([]); return; }
+    const data = snap.val();
+    callback(Object.values(data));
+  };
+  onValue(sessionsRef, handler);
+  return () => off(sessionsRef, 'value', handler);
 }
 
 // ─── FCM TOKENS ──────────────────────────────────────────
@@ -215,6 +239,47 @@ export async function fbSaveFeatures(features: any): Promise<void> {
   } catch (e) {
     console.error('fbSaveFeatures error:', e);
   }
+}
+
+// Realtime features listener
+export function fbOnFeaturesChange(callback: (features: any) => void): () => void {
+  const featRef = ref(rtdb, 'features');
+  const handler = (snap: DataSnapshot) => {
+    if (!snap.exists()) { callback(null); return; }
+    callback(snap.val());
+  };
+  onValue(featRef, handler);
+  return () => off(featRef, 'value', handler);
+}
+
+// ─── SIDEBAR CONFIG ──────────────────────────────────────
+
+export async function fbGetSidebarConfig(): Promise<any | null> {
+  try {
+    const snap = await get(ref(rtdb, 'sidebarConfig'));
+    return snap.exists() ? snap.val() : null;
+  } catch (e) {
+    console.error('fbGetSidebarConfig error:', e);
+    return null;
+  }
+}
+
+export async function fbSaveSidebarConfig(config: any): Promise<void> {
+  try {
+    await set(ref(rtdb, 'sidebarConfig'), config);
+  } catch (e) {
+    console.error('fbSaveSidebarConfig error:', e);
+  }
+}
+
+export function fbOnSidebarConfigChange(callback: (config: any) => void): () => void {
+  const sidebarRef = ref(rtdb, 'sidebarConfig');
+  const handler = (snap: DataSnapshot) => {
+    if (!snap.exists()) { callback(null); return; }
+    callback(snap.val());
+  };
+  onValue(sidebarRef, handler);
+  return () => off(sidebarRef, 'value', handler);
 }
 
 // ─── INITIAL DATA SYNC ──────────────────────────────────

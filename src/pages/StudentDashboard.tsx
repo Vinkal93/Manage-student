@@ -1,24 +1,76 @@
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { getCurrentUser } from '@/lib/auth';
-import { getStudents } from '@/lib/store';
+import { getStudents, loadStudentsFromFirebase } from '@/lib/store';
 import { getAssignments } from '@/lib/assignments';
 import { getSettings } from '@/lib/settings';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import StatCard from '@/components/StatCard';
 import { motion } from 'framer-motion';
-import { GraduationCap, CreditCard, ClipboardList, MessageSquare, BookOpen, FileText, Bell, Link as LinkIcon, Youtube, Download, QrCode } from 'lucide-react';
-import { getFeatures, calcLateFee } from '@/lib/features';
+import { GraduationCap, CreditCard, ClipboardList, MessageSquare, BookOpen, FileText, Bell, Link as LinkIcon, Youtube, Download, QrCode, Loader2 } from 'lucide-react';
+import { getFeatures, calcLateFee, loadFeaturesFromFirebase } from '@/lib/features';
+import { fbOnFeaturesChange } from '@/lib/firebaseStore';
 import { Link } from 'react-router-dom';
 
 export default function StudentDashboard() {
   const user = getCurrentUser();
   const settings = getSettings();
-  const features = getFeatures();
+  const [features, setFeatures] = useState(getFeatures());
+  const [loading, setLoading] = useState(true);
+  const [students, setStudents] = useState(getStudents());
+
+  // Load data from Firebase on mount
+  useEffect(() => {
+    let mounted = true;
+
+    const loadData = async () => {
+      try {
+        // Load students from Firebase
+        const fbStudents = await loadStudentsFromFirebase();
+        if (mounted) setStudents(fbStudents);
+
+        // Load features from Firebase
+        const fbFeatures = await loadFeaturesFromFirebase();
+        if (mounted) setFeatures(fbFeatures);
+      } catch (e) {
+        console.error('Failed to load data from Firebase:', e);
+      }
+      if (mounted) setLoading(false);
+    };
+
+    loadData();
+
+    // Listen to realtime feature changes
+    const unsubFeatures = fbOnFeaturesChange((newFeatures) => {
+      if (newFeatures && mounted) {
+        setFeatures(prev => ({
+          ...prev,
+          ...newFeatures,
+          toggles: { ...prev.toggles, ...(newFeatures.toggles || {}) },
+        }));
+      }
+    });
+
+    return () => {
+      mounted = false;
+      unsubFeatures();
+    };
+  }, []);
+
+  // Find student — try multiple matching strategies
   const student = useMemo(() => {
-    const students = getStudents();
-    return students.find(s => s.id === user?.id || s.studentId === user?.studentId);
-  }, [user]);
+    if (!user) return null;
+    // Strategy 1: Match by studentId
+    const byStudentId = students.find(s => s.studentId === user.studentId);
+    if (byStudentId) return byStudentId;
+    // Strategy 2: Match by Firebase UID
+    const byUid = students.find(s => s.firebaseUid === user.id);
+    if (byUid) return byUid;
+    // Strategy 3: Match by id
+    const byId = students.find(s => s.id === user.id);
+    if (byId) return byId;
+    return null;
+  }, [user, students]);
 
   const assignmentMessages = useMemo(() => {
     if (!student) return [];
@@ -42,8 +94,35 @@ export default function StudentDashboard() {
       }));
   }, [student]);
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <div className="text-center space-y-3">
+          <Loader2 className="animate-spin text-primary mx-auto" size={32} />
+          <p className="text-sm text-muted-foreground">Loading your data...</p>
+        </div>
+      </div>
+    );
+  }
+
   if (!student) {
-    return <div className="text-center py-20 text-muted-foreground">Student data not found. Please contact admin.</div>;
+    return (
+      <div className="text-center py-20 space-y-4">
+        <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center mx-auto">
+          <GraduationCap className="text-destructive" size={28} />
+        </div>
+        <h2 className="text-xl font-bold text-foreground">Student data not found</h2>
+        <p className="text-muted-foreground text-sm max-w-md mx-auto">
+          Your profile data is being set up. Please contact your institute administrator or try again in a few minutes.
+        </p>
+        <button
+          onClick={() => window.location.reload()}
+          className="text-sm text-primary hover:underline"
+        >
+          🔄 Refresh Page
+        </button>
+      </div>
+    );
   }
 
   const presentCount = student.attendance.filter(a => a.status === 'present').length;

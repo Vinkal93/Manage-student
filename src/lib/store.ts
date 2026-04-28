@@ -1,8 +1,9 @@
-import { fbGetStudents, fbSaveAllStudents, fbSaveStudent, fbUpdateStudent } from './firebaseStore';
+import { fbGetStudents, fbSaveAllStudents, fbSaveStudent, fbUpdateStudent, fbDeleteStudent as fbDeleteStudentFromDb } from './firebaseStore';
 
 export interface Student {
   id: string;
   studentId: string;
+  firebaseUid?: string;
   name: string;
   fatherName: string;
   mobile: string;
@@ -104,6 +105,13 @@ export function getStudentByStudentId(studentId: string): Student | undefined {
 }
 
 /**
+ * Find student by Firebase UID (used for student login)
+ */
+export function getStudentByFirebaseUid(uid: string): Student | undefined {
+  return getStudents().find(s => s.firebaseUid === uid);
+}
+
+/**
  * Save students to both localStorage and Firebase
  */
 export function saveStudents(students: Student[]) {
@@ -115,12 +123,22 @@ export function saveStudents(students: Student[]) {
 /**
  * Add a new student — saves to localStorage + Firebase
  */
-export function addStudent(data: { name: string; fatherName: string; mobile: string; course: string; admissionDate: string; feeAmount: number; whatsappNumber?: string }): Student {
+export function addStudent(data: {
+  name: string;
+  fatherName: string;
+  mobile: string;
+  course: string;
+  admissionDate: string;
+  feeAmount: number;
+  whatsappNumber?: string;
+  firebaseUid?: string;
+}): Student {
   const students = getStudents();
   const studentId = getNextStudentId();
   const newStudent: Student = {
-    id: crypto.randomUUID(),
+    id: data.firebaseUid || crypto.randomUUID(),
     studentId,
+    firebaseUid: data.firebaseUid,
     name: data.name,
     fatherName: data.fatherName,
     mobile: data.mobile,
@@ -144,6 +162,32 @@ export function addStudent(data: { name: string; fatherName: string; mobile: str
   students.push(newStudent);
   saveStudents(students);
   return newStudent;
+}
+
+/**
+ * Update student with full data
+ */
+export function updateStudentFull(studentId: string, updates: Partial<Student>) {
+  const students = getStudents();
+  const idx = students.findIndex(s => s.id === studentId);
+  if (idx < 0) return null;
+  students[idx] = { ...students[idx], ...updates };
+  saveStudents(students);
+  return students[idx];
+}
+
+/**
+ * Delete a student from localStorage + Firebase
+ */
+export function deleteStudent(studentId: string): boolean {
+  const students = getStudents();
+  const idx = students.findIndex(s => s.id === studentId);
+  if (idx < 0) return false;
+  students.splice(idx, 1);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(students));
+  // Also delete from Firebase
+  fbDeleteStudentFromDb(studentId).catch(e => console.error('Firebase delete error:', e));
+  return true;
 }
 
 export function markFeePaid(studentId: string, feeId: string, paymentMode: 'cash' | 'upi' | 'online' = 'cash') {

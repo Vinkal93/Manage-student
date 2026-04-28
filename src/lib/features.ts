@@ -1,4 +1,6 @@
-// Feature toggles + dynamic content (links, study material, QR, YouTube) — localStorage backed
+// Feature toggles + dynamic content (links, study material, QR, YouTube) — localStorage + Firebase backed
+import { fbSaveFeatures, fbGetFeatures } from './firebaseStore';
+
 export interface DynamicLink {
   id: string;
   title: string;
@@ -91,9 +93,35 @@ export function getFeatures(): FeatureConfig {
   }
 }
 
+/**
+ * Save features to localStorage AND Firebase
+ */
 export function saveFeatures(cfg: FeatureConfig) {
   localStorage.setItem(KEY, JSON.stringify(cfg));
   window.dispatchEvent(new Event('features:updated'));
+  // Sync to Firebase (fire and forget)
+  fbSaveFeatures(cfg).catch(e => console.error('Firebase features save error:', e));
+}
+
+/**
+ * Load features from Firebase and update localStorage
+ */
+export async function loadFeaturesFromFirebase(): Promise<FeatureConfig> {
+  try {
+    const data = await fbGetFeatures();
+    if (data) {
+      const cfg = {
+        ...DEFAULT,
+        ...data,
+        toggles: { ...DEFAULT.toggles, ...(data.toggles || {}) },
+      };
+      localStorage.setItem(KEY, JSON.stringify(cfg));
+      return cfg;
+    }
+    return getFeatures();
+  } catch {
+    return getFeatures();
+  }
 }
 
 // FAQ matcher used by AI Chatbot
