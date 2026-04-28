@@ -157,6 +157,23 @@ export default function StudentDashboard() {
         </div>
       </motion.div>
 
+      {/* Stopped Account Warning Banner */}
+      {student.status === 'stopped' && (
+        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
+          className="bg-destructive/10 border-2 border-destructive/30 rounded-xl p-4 flex items-start gap-3">
+          <div className="w-10 h-10 rounded-full bg-destructive/20 flex items-center justify-center flex-shrink-0">
+            <span className="text-lg">⚠️</span>
+          </div>
+          <div className="flex-1">
+            <h3 className="font-bold text-destructive text-sm">Account Suspended / अकाउंट रोक दिया गया है</h3>
+            {student.stopReason && <p className="text-sm text-foreground mt-1">कारण: {student.stopReason}</p>}
+            <p className="text-xs text-muted-foreground mt-2">
+              कृपया संस्थान से संपर्क करें: {settings.instituteContactNumber || settings.phone || 'Admin'}
+            </p>
+          </div>
+        </motion.div>
+      )}
+
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard title="Attendance" value={`${attendancePercent}%`} icon={ClipboardList} variant="primary" />
         <StatCard title="Fees Paid" value={paidFees} icon={CreditCard} variant="success" />

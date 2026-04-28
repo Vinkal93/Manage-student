@@ -10,6 +10,57 @@ import { getSettings } from "@/lib/settings";
 import { initTheme } from "@/lib/theme";
 import ThemeToggle from "@/components/ThemeToggle";
 import LangToggle from "@/components/LangToggle";
+import React from "react";
+
+// Error Boundary — prevents blank white page on crashes
+class ErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean; error?: Error }
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error: Error, info: React.ErrorInfo) {
+    console.error('App Error Boundary caught:', error, info);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-background p-4">
+          <div className="max-w-md w-full bg-card rounded-2xl border border-border shadow-lg p-8 text-center space-y-4">
+            <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center mx-auto">
+              <span className="text-3xl">💥</span>
+            </div>
+            <h2 className="text-xl font-bold text-foreground">Something went wrong</h2>
+            <p className="text-sm text-muted-foreground">
+              An unexpected error occurred. Please try refreshing the page.
+            </p>
+            {this.state.error && (
+              <pre className="text-xs bg-muted rounded-lg p-3 text-left overflow-auto max-h-32">
+                {this.state.error.message}
+              </pre>
+            )}
+            <div className="flex gap-3">
+              <button onClick={() => window.location.reload()}
+                className="flex-1 bg-primary text-primary-foreground rounded-lg py-2 text-sm font-medium hover:opacity-90">
+                🔄 Refresh Page
+              </button>
+              <button onClick={() => { window.location.href = '/login'; }}
+                className="flex-1 border border-border rounded-lg py-2 text-sm font-medium hover:bg-muted">
+                ← Go to Login
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 // Pages
 import Landing from "@/pages/Landing";
@@ -109,6 +160,7 @@ function AuthRedirect() {
 }
 
 const App = () => (
+  <ErrorBoundary>
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <Sonner />
@@ -157,6 +209,7 @@ const App = () => (
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
+  </ErrorBoundary>
 );
 
 export default App;

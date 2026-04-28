@@ -3,7 +3,7 @@ import { LayoutDashboard, Users, IndianRupee, MessageSquare, UserPlus, Clipboard
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { logout } from '@/lib/auth';
 import { getSettings } from '@/lib/settings';
-import { fbGetSidebarConfig } from '@/lib/firebaseStore';
+import { fbOnSidebarConfigChange } from '@/lib/firebaseStore';
 import type { SidebarItem } from '@/pages/SidebarConfig';
 
 const ICON_MAP: Record<string, any> = {
@@ -40,13 +40,37 @@ export default function AppSidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const [links, setLinks] = useState(defaultLinks);
 
-  // Load sidebar config
+  // Load sidebar config from Firebase with REALTIME listener
   useEffect(() => {
-    const loadConfig = () => {
-      const local = localStorage.getItem('insuite_sidebar_config');
-      if (local) {
+    // Load from localStorage first for instant render
+    const local = localStorage.getItem('insuite_sidebar_config');
+    if (local) {
+      try {
+        const cfg = JSON.parse(local);
+        if (cfg.adminItems) {
+          setLinks(cfg.adminItems.filter((i: SidebarItem) => i.visible).map((i: SidebarItem) => ({
+            to: i.to, label: i.label, icon: i.icon, category: i.category,
+          })));
+        }
+      } catch {}
+    }
+
+    // Realtime Firebase listener — auto-applies sidebar changes
+    const unsub = fbOnSidebarConfigChange(cfg => {
+      if (cfg?.adminItems) {
+        localStorage.setItem('insuite_sidebar_config', JSON.stringify(cfg));
+        setLinks(cfg.adminItems.filter((i: SidebarItem) => i.visible).map((i: SidebarItem) => ({
+          to: i.to, label: i.label, icon: i.icon, category: i.category,
+        })));
+      }
+    });
+
+    // Also listen for local events (when config page saves)
+    const handler = () => {
+      const localData = localStorage.getItem('insuite_sidebar_config');
+      if (localData) {
         try {
-          const cfg = JSON.parse(local);
+          const cfg = JSON.parse(localData);
           if (cfg.adminItems) {
             setLinks(cfg.adminItems.filter((i: SidebarItem) => i.visible).map((i: SidebarItem) => ({
               to: i.to, label: i.label, icon: i.icon, category: i.category,
@@ -55,20 +79,12 @@ export default function AppSidebar() {
         } catch {}
       }
     };
-    loadConfig();
-    // Also try Firebase
-    fbGetSidebarConfig().then(cfg => {
-      if (cfg?.adminItems) {
-        localStorage.setItem('insuite_sidebar_config', JSON.stringify(cfg));
-        setLinks(cfg.adminItems.filter((i: SidebarItem) => i.visible).map((i: SidebarItem) => ({
-          to: i.to, label: i.label, icon: i.icon, category: i.category,
-        })));
-      }
-    }).catch(() => {});
-
-    const handler = () => loadConfig();
     window.addEventListener('sidebar:updated', handler);
-    return () => window.removeEventListener('sidebar:updated', handler);
+
+    return () => {
+      unsub();
+      window.removeEventListener('sidebar:updated', handler);
+    };
   }, []);
 
   const handleLogout = () => { logout(); navigate('/login'); };

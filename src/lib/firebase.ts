@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
+import { getAuth, browserLocalPersistence, setPersistence } from "firebase/auth";
 import { getDatabase } from "firebase/database";
 import { getAnalytics, isSupported as isAnalyticsSupported } from "firebase/analytics";
 
@@ -19,6 +19,11 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const rtdb = getDatabase(app);
+
+// Explicitly set persistence to LOCAL so auth survives page refresh
+setPersistence(auth, browserLocalPersistence).catch(e => {
+  console.error('Failed to set auth persistence:', e);
+});
 
 // Analytics (only in browser, not SSR)
 let analytics: ReturnType<typeof getAnalytics> | null = null;

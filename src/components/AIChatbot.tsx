@@ -6,6 +6,7 @@ import { getSettings } from '@/lib/settings';
 import { getCurrentUser } from '@/lib/auth';
 import { getStudents } from '@/lib/store';
 import { calcLateFee } from '@/lib/features';
+import { fbOnFeaturesChange } from '@/lib/firebaseStore';
 
 interface Msg { role: 'user' | 'bot'; text: string; }
 
@@ -19,41 +20,71 @@ export default function AIChatbot() {
   const student = useMemo(() => {
     if (!user || user.role !== 'student') return null;
     const all = getStudents();
-    return all.find(s => s.id === user.id || s.studentId === user.studentId) || null;
+    return all.find(s => s.id === user.id || s.studentId === user.studentId || s.firebaseUid === user.id) || null;
   }, [user?.id]);
 
   const greeting = student
     ? `नमस्ते ${student.name} 👋\nमैं ${settings.instituteShortName} का AI सहायक हूँ। आप अपनी attendance, fees, course, assignments, या किसी भी निजी जानकारी के बारे में पूछ सकते हैं।`
     : `नमस्ते 👋 मैं ${settings.instituteShortName} का AI सहायक हूँ। आप fees, attendance, assignments या किसी भी जानकारी के बारे में पूछ सकते हैं।`;
 
-  const [messages, setMessages] = useState<Msg[]>([
-    { role: 'bot', text: greeting },
-  ]);
+  const [messages, setMessages] = useState<Msg[]>([{ role: 'bot', text: greeting }]);
   const endRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const onUpd = () => setEnabled(getFeatures().toggles.chatbot);
     window.addEventListener('features:updated', onUpd);
-    return () => window.removeEventListener('features:updated', onUpd);
+    // Also listen to Firebase feature changes
+    const unsub = fbOnFeaturesChange((feat) => {
+      if (feat?.toggles) setEnabled(feat.toggles.chatbot ?? true);
+    });
+    return () => { window.removeEventListener('features:updated', onUpd); unsub(); };
   }, []);
 
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, open, typing]);
 
   if (!enabled) return null;
 
+  // Match against knowledge base
+  const matchKnowledge = (query: string): string | null => {
+    const kb = settings.knowledgeBase || [];
+    if (kb.length === 0) return null;
+    const q = query.toLowerCase();
+    let best: { score: number; content: string } | null = null;
+    for (const entry of kb) {
+      if (!entry.topic || !entry.content) continue;
+      const topicWords = entry.topic.toLowerCase().split(/\s+/);
+      let score = 0;
+      for (const w of topicWords) {
+        if (w.length > 2 && q.includes(w)) score += 2;
+      }
+      // Also check content words
+      const contentWords = entry.content.toLowerCase().split(/\s+/).slice(0, 20);
+      for (const w of contentWords) {
+        if (w.length > 3 && q.includes(w)) score++;
+      }
+      if (score > 0 && (!best || score > best.score)) {
+        best = { score, content: `📌 **${entry.topic}:**\n${entry.content}` };
+      }
+    }
+    return best?.content || null;
+  };
+
   const answerPersonal = (q: string): string | null => {
     if (!student) return null;
-    const t = q.toLowerCase();
 
-    // Personal identity
     if (/(मेरा नाम|my name|naam|kaun hu|who am i)/i.test(q)) {
       return `आपका नाम **${student.name}** है। Student ID: ${student.studentId}, Course: ${student.course}.`;
     }
-    if (/(पिता|father|papa)/i.test(q)) {
-      return `आपके पिता का नाम **${student.fatherName}** है।`;
-    }
+    if (/(पिता|father|papa)/i.test(q)) return `आपके पिता का नाम **${student.fatherName}** है।`;
+    if (/(माता|mother|maa|mummy)/i.test(q) && student.motherName) return `आपकी माता का नाम **${student.motherName}** है।`;
     if (/(mobile|phone|number|नंबर|mobail)/i.test(q)) {
       return `आपका registered mobile: **${student.mobile}**, WhatsApp: ${student.whatsappNumber || student.mobile}`;
+    }
+    if (/(address|पता|address)/i.test(q) && student.address) return `आपका पता: **${student.address}**`;
+    if (/(email|ईमेल)/i.test(q) && student.email) return `आपका email: **${student.email}**`;
+    if (/(aadhar|आधार)/i.test(q) && student.aadharNumber) return `आपका Aadhar: **${student.aadharNumber}**`;
+    if (/(dob|birthday|जन्म|date of birth)/i.test(q) && student.dob) {
+      return `आपकी जन्मतिथि: **${new Date(student.dob).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}**`;
     }
     if (/(कब से|kab se|since when|joining|join|admission|प्रवेश)/i.test(q)) {
       const months = Math.floor((Date.now() - new Date(student.admissionDate).getTime()) / (30 * 86400000));
@@ -62,16 +93,12 @@ export default function AIChatbot() {
     if (/(course|कोर्स|class|पढ़ाई|kya padh)/i.test(q)) {
       return `आप **${student.course}** course कर रहे हैं। Monthly fee: ₹${student.feeAmount}`;
     }
-
-    // Attendance
     if (/(attendance|उपस्थिति|hazri|present|absent)/i.test(q)) {
       const present = student.attendance.filter(a => a.status === 'present').length;
       const total = student.attendance.length;
       const pct = total > 0 ? Math.round((present / total) * 100) : 0;
       return `आपकी attendance: **${pct}%** (${present}/${total} दिन present)। ${pct < 75 ? '⚠️ 75% से कम है, सुधारें।' : '✅ अच्छी attendance है!'}`;
     }
-
-    // Fees
     if (/(fee|फीस|payment|baki|pending|due|paid|जमा)/i.test(q)) {
       const paid = student.feeRecords.filter(f => f.status === 'paid').length;
       const totalPaid = student.feeRecords.filter(f => f.status === 'paid').reduce((a, b) => a + (b.paidAmount ?? b.amount), 0);
@@ -79,31 +106,27 @@ export default function AIChatbot() {
       const lateFee = student.feeRecords.reduce((acc, f) => acc + calcLateFee(f.dueDate, f.status === 'paid', f.paidDate), 0);
       return `💰 **Fee Status:**\n✅ Paid: ₹${totalPaid.toLocaleString()} (${paid} months)\n⏳ Pending: ₹${pendingAmt.toLocaleString()}\n⚠️ Late Fee: ₹${lateFee}\n💵 Total Payable: ₹${(pendingAmt + lateFee).toLocaleString()}`;
     }
-
-    // Last payment
     if (/(last|पिछला|recent).*(payment|fee)/i.test(q)) {
       const last = [...student.feeRecords].filter(f => f.paidDate).sort((a,b) => new Date(b.paidDate!).getTime() - new Date(a.paidDate!).getTime())[0];
       if (last) return `आपकी last payment ₹${last.paidAmount ?? last.amount} थी, ${new Date(last.paidDate!).toLocaleDateString('en-IN')} को (${last.paymentMode || 'cash'})`;
       return 'अभी तक कोई payment record नहीं है।';
     }
-
-    // Greeting
-    if (/(hi|hello|hey|namaste|नमस्ते|hii)/i.test(q)) {
-      return `नमस्ते ${student.name}! कैसे मदद कर सकता हूँ? 😊`;
-    }
+    if (/(hi|hello|hey|namaste|नमस्ते|hii)/i.test(q)) return `नमस्ते ${student.name}! कैसे मदद कर सकता हूँ? 😊`;
     return null;
   };
 
   const handleSend = () => {
-    const text = input.trim();
-    if (!text) return;
+    const text = input.trim(); if (!text) return;
     setMessages(prev => [...prev, { role: 'user', text }]);
-    setInput('');
-    setTyping(true);
+    setInput(''); setTyping(true);
     const delay = 600 + Math.random() * 700;
     setTimeout(() => {
+      // Priority: personal > knowledge base > FAQ > fallback
       const personal = answerPersonal(text);
-      const ans = personal || matchFaq(text) || `माफ कीजिए, मैं इसका सटीक जवाब नहीं दे पाया। कृपया Admin से संपर्क करें${settings.phone ? ` (📞 ${settings.phone})` : ''}.`;
+      const knowledge = !personal ? matchKnowledge(text) : null;
+      const faq = !personal && !knowledge ? matchFaq(text) : null;
+      const ans = personal || knowledge || faq ||
+        `माफ कीजिए, मैं इसका सटीक जवाब नहीं दे पाया। कृपया Admin से संपर्क करें${settings.phone ? ` (📞 ${settings.phone})` : ''}.`;
       setTyping(false);
       setMessages(prev => [...prev, { role: 'bot', text: ans }]);
     }, delay);
@@ -111,34 +134,22 @@ export default function AIChatbot() {
 
   return (
     <>
-      <button
-        onClick={() => setOpen(true)}
+      <button onClick={() => setOpen(true)}
         className="fixed bottom-20 right-4 md:bottom-6 md:right-6 z-40 w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-lg hover:scale-105 active:scale-95 transition-transform flex items-center justify-center"
-        aria-label="Open AI Chatbot"
-      >
-        <MessageCircle size={24} />
-      </button>
+        aria-label="Open AI Chatbot"><MessageCircle size={24} /></button>
 
       <AnimatePresence>
         {open && (
-          <motion.div
-            initial={{ opacity: 0, y: 20, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 20, scale: 0.95 }}
-            transition={{ duration: 0.2 }}
-            className="fixed bottom-4 right-4 left-4 md:left-auto md:bottom-6 md:right-6 z-50 w-auto md:w-[380px] h-[70vh] md:h-[520px] bg-card rounded-2xl border border-border shadow-2xl flex flex-col overflow-hidden"
-          >
+          <motion.div initial={{ opacity: 0, y: 20, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.95 }} transition={{ duration: 0.2 }}
+            className="fixed bottom-4 right-4 left-4 md:left-auto md:bottom-6 md:right-6 z-50 w-auto md:w-[380px] h-[70vh] md:h-[520px] bg-card rounded-2xl border border-border shadow-2xl flex flex-col overflow-hidden">
             <div className="bg-primary text-primary-foreground p-4 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-full bg-primary-foreground/20 flex items-center justify-center"><Bot size={16} /></div>
-                <div>
-                  <p className="font-semibold text-sm">AI सहायक</p>
-                  <p className="text-xs opacity-80">Online • Quick Help</p>
-                </div>
+                <div><p className="font-semibold text-sm">AI सहायक</p><p className="text-xs opacity-80">Online • Quick Help</p></div>
               </div>
               <button onClick={() => setOpen(false)} className="p-1 rounded hover:bg-primary-foreground/10"><X size={18} /></button>
             </div>
-
             <div className="flex-1 overflow-y-auto p-3 space-y-2 bg-muted/30">
               {messages.map((m, i) => (
                 <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
@@ -161,16 +172,10 @@ export default function AIChatbot() {
               )}
               <div ref={endRef} />
             </div>
-
             <div className="p-2 border-t border-border bg-card flex gap-2">
-              <input
-                value={input}
-                onChange={e => setInput(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && handleSend()}
-                placeholder="अपना सवाल लिखें..."
-                className="flex-1 bg-muted/50 border border-border rounded-full px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
-                maxLength={300}
-              />
+              <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSend()}
+                placeholder="अपना सवाल लिखें..." maxLength={300}
+                className="flex-1 bg-muted/50 border border-border rounded-full px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40" />
               <button onClick={handleSend} className="w-10 h-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center hover:opacity-90 active:scale-95">
                 <Send size={16} />
               </button>

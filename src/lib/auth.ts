@@ -5,8 +5,9 @@ import {
   signOut,
   onAuthStateChanged,
   User as FirebaseUser,
+  updatePassword,
 } from 'firebase/auth';
-import { fbIsAdmin, fbSetAdmin, fbLogSession, fbUpdateSession } from './firebaseStore';
+import { fbIsAdmin, fbSetAdmin, fbLogSession, fbUpdateSession, fbGetActiveSessionsForUser, fbForceLogoutOtherSessions, fbSaveStudentPassword } from './firebaseStore';
 
 export type UserRole = 'admin' | 'student';
 
@@ -21,7 +22,6 @@ export interface AuthUser {
 const AUTH_KEY = 'sbci_auth';
 
 // In-memory admin credentials for re-auth after student creation
-// NEVER persisted to storage — only lives in RAM
 let _adminEmail: string | null = null;
 let _adminPassword: string | null = null;
 
@@ -37,11 +37,23 @@ export function studentIdToEmail(studentId: string): string {
 }
 
 /**
+ * Check if another device has active sessions for this user
+ * Returns the count of active sessions
+ */
+export async function checkActiveSessions(userId: string): Promise<number> {
+  const sessions = await fbGetActiveSessionsForUser(userId);
+  return sessions.length;
+}
+
+/**
  * Login with Firebase Auth
- * Admin: email + password (created in Firebase Auth console)
+ * Admin: email + password
  * Student: studentId → converted to email → login
  */
-export async function loginWithFirebase(identifier: string, password: string): Promise<AuthUser | null> {
+export async function loginWithFirebase(
+  identifier: string,
+  password: string
+): Promise<{ user: AuthUser | null; hasOtherSessions: boolean }> {
   try {
     const isAdmin = identifier.includes('@');
     const email = isAdmin ? identifier : studentIdToEmail(identifier);
@@ -49,15 +61,11 @@ export async function loginWithFirebase(identifier: string, password: string): P
     const cred = await signInWithEmailAndPassword(auth, email, password);
 
     if (isAdmin) {
-      // Store admin credentials in memory for re-auth after student creation
       _adminEmail = identifier;
       _adminPassword = password;
 
-      // Check if this user is an admin in Realtime DB
       const isAdminUser = await fbIsAdmin(cred.user.uid);
-      
       if (!isAdminUser) {
-        // First admin login — auto-register as admin
         await fbSetAdmin(cred.user.uid, identifier);
       }
 
@@ -67,51 +75,93 @@ export async function loginWithFirebase(identifier: string, password: string): P
         name: cred.user.displayName || 'Admin',
         role: 'admin',
       };
+
+      // Admin can login on multiple devices — just log session
       localStorage.setItem(AUTH_KEY, JSON.stringify(user));
       await logSessionToFirebase(user);
       startHeartbeat();
-      return user;
+      return { user, hasOtherSessions: false };
     } else {
-      // Student login
+      // Student login — enforce single session
       const user: AuthUser = {
         id: cred.user.uid,
         studentId: identifier.toUpperCase(),
         name: identifier.toUpperCase(),
         role: 'student',
       };
+
+      // Check for existing active sessions
+      const activeSessions = await fbGetActiveSessionsForUser(cred.user.uid);
+      const hasOther = activeSessions.length > 0;
+
       localStorage.setItem(AUTH_KEY, JSON.stringify(user));
       await logSessionToFirebase(user);
+
+      // Force logout other student sessions (single session enforcement)
+      if (hasOther && _currentSessionKey) {
+        await fbForceLogoutOtherSessions(cred.user.uid, _currentSessionKey);
+      }
+
       startHeartbeat();
-      return user;
+      return { user, hasOtherSessions: hasOther };
     }
   } catch (err: any) {
     console.error('Firebase login error:', err.code, err.message);
-    return null;
+    return { user: null, hasOtherSessions: false };
   }
 }
 
 /**
  * Create Firebase Auth account for student
  * Called when admin adds a new student
- * Returns the Firebase UID of the created student
  */
-export async function createStudentFirebaseAccount(studentId: string, password: string): Promise<{ success: boolean; uid?: string }> {
+export async function createStudentFirebaseAccount(
+  studentId: string,
+  password: string
+): Promise<{ success: boolean; uid?: string }> {
   try {
     const email = studentIdToEmail(studentId);
+
+    // Try to create new account
     const cred = await createUserWithEmailAndPassword(auth, email, password);
     const studentUid = cred.user.uid;
 
-    // Creating a user auto-signs in as that user — re-auth as admin
+    // Save password to Firebase RTDB for cross-device reference
+    await fbSaveStudentPassword(studentId.toUpperCase(), password);
+
+    // Re-auth as admin
     await reAuthenticateAdmin();
 
     return { success: true, uid: studentUid };
   } catch (err: any) {
     console.error('Create student account error:', err.code, err.message);
     if (err.code === 'auth/email-already-in-use') {
-      // Account already exists, that's fine
-      // Try to re-auth as admin in case we got signed out
-      await reAuthenticateAdmin();
-      return { success: true };
+      // Account exists — try to update password by signing in and updating
+      try {
+        const email = studentIdToEmail(studentId);
+        // Sign in as student to update password
+        const cred = await signInWithEmailAndPassword(auth, email, password);
+        // Save updated password to RTDB
+        await fbSaveStudentPassword(studentId.toUpperCase(), password);
+        await reAuthenticateAdmin();
+        return { success: true, uid: cred.user.uid };
+      } catch (innerErr: any) {
+        // If login fails with old password, try with default
+        try {
+          const email = studentIdToEmail(studentId);
+          const cred = await signInWithEmailAndPassword(auth, email, 'sbci123');
+          // Update to new password
+          await updatePassword(cred.user, password);
+          await fbSaveStudentPassword(studentId.toUpperCase(), password);
+          await reAuthenticateAdmin();
+          return { success: true, uid: cred.user.uid };
+        } catch {
+          await reAuthenticateAdmin();
+          // Still save the password to RTDB
+          await fbSaveStudentPassword(studentId.toUpperCase(), password);
+          return { success: true };
+        }
+      }
     }
     return { success: false };
   }
@@ -119,7 +169,6 @@ export async function createStudentFirebaseAccount(studentId: string, password: 
 
 /**
  * Re-authenticate as admin after student creation
- * Uses in-memory cached credentials (never persisted)
  */
 async function reAuthenticateAdmin(): Promise<boolean> {
   if (!_adminEmail || !_adminPassword) {
@@ -139,7 +188,6 @@ async function reAuthenticateAdmin(): Promise<boolean> {
  * Logout from Firebase
  */
 export async function logoutFirebase() {
-  // Mark session as ended
   if (_currentSessionKey) {
     await fbUpdateSession(_currentSessionKey, {
       isActive: false,
@@ -151,11 +199,7 @@ export async function logoutFirebase() {
   _adminEmail = null;
   _adminPassword = null;
 
-  try {
-    await signOut(auth);
-  } catch (e) {
-    console.error('Logout error:', e);
-  }
+  try { await signOut(auth); } catch (e) { console.error('Logout error:', e); }
   localStorage.removeItem(AUTH_KEY);
   localStorage.removeItem('sbci_current_session');
 }
@@ -174,7 +218,6 @@ export function getCurrentUser(): AuthUser | null {
 
 /**
  * Listen to Firebase Auth state changes
- * Returns unsubscribe function
  */
 export function onAuthChange(callback: (user: FirebaseUser | null) => void): () => void {
   return onAuthStateChanged(auth, callback);
@@ -187,7 +230,7 @@ export function getFirebaseUser(): FirebaseUser | null {
   return auth.currentUser;
 }
 
-// Session logging — saves to both localStorage and Firebase
+// Session logging
 async function logSessionToFirebase(user: AuthUser) {
   const session = {
     id: crypto.randomUUID(),
@@ -205,19 +248,17 @@ async function logSessionToFirebase(user: AuthUser) {
     currentPage: window.location.pathname || '/',
   };
 
-  // Save to localStorage
   const sessions = JSON.parse(localStorage.getItem('sbci_sessions') || '[]');
   sessions.push(session);
   if (sessions.length > 500) sessions.splice(0, sessions.length - 500);
   localStorage.setItem('sbci_sessions', JSON.stringify(sessions));
   localStorage.setItem('sbci_current_session', JSON.stringify(session));
 
-  // Save to Firebase and get the key
   _currentSessionKey = await fbLogSession(session);
 }
 
 /**
- * Update session activity — both localStorage and Firebase
+ * Update session activity
  */
 export function updateSessionActivity(page: string) {
   const session = JSON.parse(localStorage.getItem('sbci_current_session') || 'null');
@@ -230,7 +271,6 @@ export function updateSessionActivity(page: string) {
     if (idx >= 0) sessions[idx] = session;
     localStorage.setItem('sbci_sessions', JSON.stringify(sessions));
 
-    // Sync to Firebase
     if (_currentSessionKey) {
       fbUpdateSession(_currentSessionKey, {
         lastActivity: session.lastActivity,
@@ -242,8 +282,7 @@ export function updateSessionActivity(page: string) {
 }
 
 /**
- * Heartbeat — sends activity ping every 30s to Firebase
- * This enables live user tracking in admin analytics
+ * Heartbeat — sends activity ping every 30s
  */
 function startHeartbeat() {
   stopHeartbeat();
@@ -255,7 +294,7 @@ function startHeartbeat() {
         currentPage: window.location.pathname,
       }).catch(() => {});
     }
-  }, 30000); // every 30 seconds
+  }, 30000);
 }
 
 function stopHeartbeat() {
@@ -267,4 +306,12 @@ function stopHeartbeat() {
 
 export function getSessions() {
   return JSON.parse(localStorage.getItem('sbci_sessions') || '[]');
+}
+
+/**
+ * Open Gmail compose with pre-filled message
+ */
+export function openGmailCompose(to: string, subject: string, body: string) {
+  const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(to)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  window.open(gmailUrl, '_blank', 'noopener,noreferrer');
 }

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
@@ -7,12 +7,7 @@ import { fbGetSidebarConfig, fbSaveSidebarConfig } from '@/lib/firebaseStore';
 import { GripVertical, Save, RotateCcw, Eye, Loader2, LayoutDashboard, Users, IndianRupee, UserPlus, UserCog, Wallet, Calendar, FileText, ClipboardList, MessageSquare, Send, BarChart3, Activity, Database, Sheet, Settings, ToggleRight, CalendarDays } from 'lucide-react';
 
 export interface SidebarItem {
-  id: string;
-  to: string;
-  label: string;
-  icon: string;
-  visible: boolean;
-  category: string;
+  id: string; to: string; label: string; icon: string; visible: boolean; category: string;
 }
 
 const ICON_MAP: Record<string, any> = {
@@ -46,15 +41,26 @@ export function getDefaultSidebarConfig() { return { adminItems: DEFAULT_ADMIN_I
 
 export default function SidebarConfig() {
   const [items, setItems] = useState<SidebarItem[]>(DEFAULT_ADMIN_ITEMS);
-  const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [dragIdx, setDragIdx] = useState<number | null>(null);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     fbGetSidebarConfig().then(cfg => {
       if (cfg?.adminItems) setItems(cfg.adminItems);
       setLoading(false);
     });
+  }, []);
+
+  // Auto-save with debounce — saves 500ms after last change
+  const autoSave = useCallback((newItems: SidebarItem[]) => {
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(async () => {
+      const cfg = { adminItems: newItems };
+      localStorage.setItem('insuite_sidebar_config', JSON.stringify(cfg));
+      await fbSaveSidebarConfig(cfg);
+      window.dispatchEvent(new Event('sidebar:updated'));
+    }, 500);
   }, []);
 
   const handleDragStart = (idx: number) => setDragIdx(idx);
@@ -67,33 +73,34 @@ export default function SidebarConfig() {
     setItems(newItems);
     setDragIdx(idx);
   };
-  const handleDragEnd = () => setDragIdx(null);
+  const handleDragEnd = () => {
+    setDragIdx(null);
+    autoSave(items); // Auto-save after drag
+  };
 
   const toggleVisibility = (id: string) => {
-    setItems(items.map(i => i.id === id ? { ...i, visible: !i.visible } : i));
+    const newItems = items.map(i => i.id === id ? { ...i, visible: !i.visible } : i);
+    setItems(newItems);
+    autoSave(newItems); // Auto-save after toggle
   };
 
   const updateCategory = (id: string, category: string) => {
-    setItems(items.map(i => i.id === id ? { ...i, category } : i));
+    const newItems = items.map(i => i.id === id ? { ...i, category } : i);
+    setItems(newItems);
+    autoSave(newItems);
   };
 
   const updateLabel = (id: string, label: string) => {
-    setItems(items.map(i => i.id === id ? { ...i, label } : i));
+    const newItems = items.map(i => i.id === id ? { ...i, label } : i);
+    setItems(newItems);
+    autoSave(newItems);
   };
 
-  const save = async () => {
-    setSaving(true);
-    try {
-      const cfg = { adminItems: items };
-      localStorage.setItem('insuite_sidebar_config', JSON.stringify(cfg));
-      await fbSaveSidebarConfig(cfg);
-      window.dispatchEvent(new Event('sidebar:updated'));
-      toast.success('Sidebar config saved! ✅');
-    } catch { toast.error('Failed to save'); }
-    setSaving(false);
+  const reset = () => {
+    setItems(DEFAULT_ADMIN_ITEMS);
+    autoSave(DEFAULT_ADMIN_ITEMS);
+    toast.info('Reset to default');
   };
-
-  const reset = () => { setItems(DEFAULT_ADMIN_ITEMS); toast.info('Reset to default'); };
 
   const categories = [...new Set(items.map(i => i.category))];
 
@@ -104,42 +111,25 @@ export default function SidebarConfig() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Sidebar Configuration</h1>
-          <p className="text-sm text-muted-foreground mt-1">Drag to reorder, toggle visibility, change categories</p>
+          <p className="text-sm text-muted-foreground mt-1">Drag to reorder, toggle visibility — changes auto-save & apply instantly ✨</p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={reset} className="gap-1.5"><RotateCcw size={14} /> Reset</Button>
-          <Button size="sm" onClick={save} disabled={saving} className="gap-1.5">
-            {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Save
-          </Button>
-        </div>
+        <Button variant="outline" size="sm" onClick={reset} className="gap-1.5"><RotateCcw size={14} /> Reset</Button>
       </div>
 
       <div className="bg-card rounded-xl border border-border shadow-sm divide-y divide-border">
         {items.map((item, idx) => {
           const IconComp = ICON_MAP[item.icon] || Settings;
           return (
-            <div
-              key={item.id}
-              draggable
-              onDragStart={() => handleDragStart(idx)}
-              onDragOver={(e) => handleDragOver(e, idx)}
-              onDragEnd={handleDragEnd}
-              className={`flex items-center gap-3 p-3 transition-colors ${dragIdx === idx ? 'bg-primary/5' : 'hover:bg-muted/50'} ${!item.visible ? 'opacity-50' : ''}`}
-            >
+            <div key={item.id} draggable onDragStart={() => handleDragStart(idx)}
+              onDragOver={(e) => handleDragOver(e, idx)} onDragEnd={handleDragEnd}
+              className={`flex items-center gap-3 p-3 transition-colors ${dragIdx === idx ? 'bg-primary/5' : 'hover:bg-muted/50'} ${!item.visible ? 'opacity-50' : ''}`}>
               <GripVertical size={16} className="text-muted-foreground cursor-grab shrink-0" />
               <span className="text-xs text-muted-foreground w-6 text-center">{idx + 1}</span>
               <IconComp size={16} className="text-primary shrink-0" />
-              <Input
-                value={item.label}
-                onChange={e => updateLabel(item.id, e.target.value)}
-                className="h-8 text-sm flex-1 max-w-[160px]"
-              />
-              <Input
-                value={item.category}
-                onChange={e => updateCategory(item.id, e.target.value)}
-                className="h-8 text-xs w-24 text-muted-foreground"
-                placeholder="Category"
-              />
+              <Input value={item.label} onChange={e => updateLabel(item.id, e.target.value)}
+                className="h-8 text-sm flex-1 max-w-[160px]" />
+              <Input value={item.category} onChange={e => updateCategory(item.id, e.target.value)}
+                className="h-8 text-xs w-24 text-muted-foreground" placeholder="Category" />
               <Switch checked={item.visible} onCheckedChange={() => toggleVisibility(item.id)} />
             </div>
           );

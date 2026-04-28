@@ -37,7 +37,6 @@ export default function Login() {
       setCheckingAuth(false);
     });
 
-    // Timeout fallback
     const timeout = setTimeout(() => setCheckingAuth(false), 2000);
 
     return () => {
@@ -70,12 +69,16 @@ export default function Login() {
     setLoading(true);
 
     try {
-      const user = await loginWithFirebase(identifier, password);
-      if (user) {
-        toast.success(`Welcome ${user.name}! 🎉`);
-        navigate(user.role === 'admin' ? '/admin' : '/student');
+      const result = await loginWithFirebase(identifier, password);
+      if (result.user) {
+        if (result.hasOtherSessions && result.user.role === 'student') {
+          toast.info('Previous device se logout kar diya gaya hai. Ab yahan login ho gaye.');
+        }
+        toast.success(`Welcome ${result.user.name}! 🎉`);
+        // Use replace to prevent back-button going to login
+        navigate(result.user.role === 'admin' ? '/admin' : '/student', { replace: true });
       } else {
-        toast.error('Invalid email or password. Please check your credentials.');
+        toast.error('Invalid credentials. Please check your email/ID and password.');
       }
     } catch (err: any) {
       console.error('Login error:', err);
