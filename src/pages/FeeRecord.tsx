@@ -103,7 +103,15 @@ export default function FeeRecord() {
     });
     setShowWhatsApp(true);
 
-    toast.success(`₹${amount} fee recorded for ${student.name}${pendingAfter > 0 ? ` (₹${pendingAfter} pending)` : ' ✓ Fully paid'}`);
+    const receiptPayload = {
+      studentName: student.name, studentId: student.studentId, course: student.course,
+      amount: totalDue, paidAmount: paidAmt, pendingAmount: pendingAfter,
+      month: monthName, date, paymentMode, txnId: txnId.trim() || undefined, receiptNo,
+    };
+    toast.success(`₹${amount} recorded for ${student.name}${pendingAfter > 0 ? ` (₹${pendingAfter} pending)` : ' ✓ Fully paid'}`, {
+      action: { label: '⬇ Receipt', onClick: () => downloadReceipt(receiptPayload) },
+      duration: 6000,
+    });
     setSelectedStudentId(''); setAmount(''); setNote(''); setSearch(''); setTxnId(''); setReceiptUrl(''); setReceiptName('');
     setRefreshKey(k => k + 1);
   };
