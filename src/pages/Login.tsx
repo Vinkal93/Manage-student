@@ -42,17 +42,6 @@ export default function Login() {
     setLoading(true);
 
     try {
-      let user = await loginWithFirebase(identifier, password);
-      if (!user) {
-        user = login(identifier, password);
-      }
-      if (user) {
-        toast.success(`Welcome ${user.name}!`);
-        navigate(user.role === 'admin' ? '/admin' : '/student');
-      } else {
-        toast.error('Invalid credentials');
-      }
-    } catch {
       const user = login(identifier, password);
       if (user) {
         toast.success(`Welcome ${user.name}!`);
@@ -60,6 +49,8 @@ export default function Login() {
       } else {
         toast.error('Invalid credentials');
       }
+    } catch (err: any) {
+      toast.error(err?.message || 'Login failed');
     }
     setLoading(false);
   };

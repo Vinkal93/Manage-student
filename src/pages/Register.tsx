@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, ArrowRight, Building2, User, MapPin, BookOpen, CheckCircle, GraduationCap, Clock } from 'lucide-react';
+import { generateAdminPassword } from '@/lib/tenant';
 
 interface RegistrationData {
   instituteName: string;
@@ -56,6 +57,8 @@ export default function Register() {
       id: crypto.randomUUID(),
       ...data,
       status: 'pending',
+      plan: 'free',
+      adminPassword: generateAdminPassword(),
       submittedAt: new Date().toISOString(),
     });
     localStorage.setItem('insuite_registrations', JSON.stringify(registrations));
