@@ -139,8 +139,7 @@ export default function DatabaseSettings() {
       a.click(); URL.revokeObjectURL(url);
       toast.success('JSON exported!');
     } else if (format === 'CSV') {
-      // Export students as CSV
-      const { getStudents } = await import('@/lib/store');
+      // Export students as CSV (tenant-scoped)
       const students = getStudents();
       if (students.length === 0) { toast.info('No student data to export'); return; }
       const headers = ['Student ID', 'Name', 'Father Name', 'Mobile', 'Course', 'Admission Date', 'Status'];
