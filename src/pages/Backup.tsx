@@ -5,9 +5,10 @@ import { Badge } from '@/components/ui/badge';
 import { motion } from 'framer-motion';
 import { Download, Upload, Database, FileJson, AlertTriangle, CheckCircle, HardDrive, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
+import { getCurrentInstituteId } from '@/lib/tenant';
 
 const BACKUP_KEYS = [
-  { key: 'sbci_students', label: 'Students Data', icon: '👨‍🎓' },
+  { key: `sbci_students::${getCurrentInstituteId() || 'demo-institute'}`, label: 'Students Data (this institute)', icon: '👨‍🎓' },
   { key: 'insuite_timetable', label: 'Timetable', icon: '📅' },
   { key: 'insuite_assignments', label: 'Assignments', icon: '📝' },
   { key: 'sbci_settings', label: 'Institute Settings', icon: '⚙️' },
