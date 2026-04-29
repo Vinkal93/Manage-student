@@ -176,12 +176,14 @@ export default function FeeCalendar() {
               <h3 className="font-semibold text-foreground">{new Date(selectedDate).toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}</h3>
               <p className="text-xs text-muted-foreground">{dueOnDate.length} pending fee(s) • Total ₹{dueOnDate.reduce((a,b) => a+b.amount, 0).toLocaleString()}</p>
             </div>
-            <Button size="sm" className="gap-1.5" disabled={selected.size === 0} onClick={sendReminders}>
-              <Send size={14} /> Send ({selected.size})
-            </Button>
-            <Button size="sm" variant="destructive" className="gap-1.5" disabled={selected.size === 0} onClick={sendFinalWarnings}>
-              <AlertTriangle size={14} /> Final Warning
-            </Button>
+            <div className="flex flex-wrap gap-2 justify-end">
+              <Button size="sm" className="gap-1.5" disabled={selected.size === 0} onClick={sendReminders}>
+                <Send size={14} /> Reminder ({selected.size})
+              </Button>
+              <Button size="sm" variant="destructive" className="gap-1.5" disabled={selected.size === 0} onClick={sendFinalWarnings}>
+                <AlertTriangle size={14} /> Final Warning
+              </Button>
+            </div>
           </div>
           <div className="space-y-2 max-h-[420px] overflow-y-auto">
             {dueOnDate.length === 0 ? (
