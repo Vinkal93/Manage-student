@@ -19,7 +19,10 @@ import {
   CheckCircle, FileSpreadsheet, Users, Shield, Image as ImageIcon, Share2,
   FileDown, Mail, AlertTriangle, Copy, MessageCircle
 } from 'lucide-react';
-import { shareStudentOnWhatsApp, openWhatsApp, generateAdmissionMessage } from '@/lib/whatsapp';
+import { shareStudentOnWhatsApp, openWhatsApp, generateAdmissionMessage, buildStudentSummary } from '@/lib/whatsapp';
+import WhatsAppConfirmDialog from '@/components/WhatsAppConfirmDialog';
+import { updateStudentPhoto as updPhoto } from '@/lib/store';
+import { Trash2 } from 'lucide-react';
 
 export default function StudentManagement() {
   const navigate = useNavigate();
@@ -38,6 +41,7 @@ export default function StudentManagement() {
   const [stopReason, setStopReason] = useState('');
   const photoInputRef = useRef<HTMLInputElement>(null);
   const [photoTarget, setPhotoTarget] = useState<Student | null>(null);
+  const [shareTarget, setShareTarget] = useState<Student | null>(null);
 
   const students = useMemo(() => getStudents(), [refreshKey]);
   const courses = [...new Set(students.map(s => s.course))];
@@ -168,6 +172,13 @@ export default function StudentManagement() {
     toast.success('Welcome message copied!');
   };
 
+  const removePhoto = (s: Student) => {
+    if (!s.photo) { toast.info('No photo to remove'); return; }
+    updPhoto(s.id, '');
+    toast.success(`Photo removed for ${s.name}`);
+    setRefreshKey(k => k + 1);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -248,19 +259,24 @@ export default function StudentManagement() {
                   </td>
                   <td className="p-4">
                     <div className="flex gap-1 flex-wrap">
-                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="View" onClick={() => navigate(`/admin/student/${s.id}`)}><Eye size={14} /></Button>
-                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="Photo" onClick={() => triggerPhotoUpload(s)}><ImageIcon size={14} className="text-primary" /></Button>
-                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="WhatsApp" onClick={() => shareStudentOnWhatsApp(s)}><Share2 size={14} className="text-green-500" /></Button>
+                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="View Profile" onClick={() => navigate(`/admin/student/${s.id}`)}><Eye size={14} /></Button>
+                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="Upload Photo" onClick={() => triggerPhotoUpload(s)}><ImageIcon size={14} className="text-primary" /></Button>
+                      {s.photo && (
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="Remove Photo" onClick={() => removePhoto(s)}>
+                          <Trash2 size={14} className="text-destructive" />
+                        </Button>
+                      )}
+                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="Share on WhatsApp" onClick={() => setShareTarget(s)}><Share2 size={14} className="text-success" /></Button>
                       <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="Copy Welcome" onClick={() => copyWelcomeMsg(s)}><Copy size={14} className="text-blue-500" /></Button>
                       <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="Email" onClick={() => handleSendEmail(s)}><Mail size={14} className="text-orange-500" /></Button>
-                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="Password" onClick={() => { setSelectedStudent(s); setShowPasswordDialog(true); }}><Key size={14} /></Button>
-                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="Message" onClick={() => { setSelectedStudent(s); setShowMessageDialog(true); }}><MessageSquare size={14} /></Button>
+                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="Change Password" onClick={() => { setSelectedStudent(s); setShowPasswordDialog(true); }}><Key size={14} /></Button>
+                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="Send Message" onClick={() => { setSelectedStudent(s); setShowMessageDialog(true); }}><MessageSquare size={14} /></Button>
                       {s.status === 'active' ? (
                         <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="Stop Account" onClick={() => { setSelectedStudent(s); setShowStopDialog(true); }}><Ban size={14} className="text-destructive" /></Button>
                       ) : (
                         <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="Activate" onClick={() => handleActivate(s)}><CheckCircle size={14} className="text-green-500" /></Button>
                       )}
-                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="Firebase Auth" onClick={() => handleCreateFirebaseAccount(s)}><Shield size={14} className="text-primary" /></Button>
+                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="Create Firebase Account" onClick={() => handleCreateFirebaseAccount(s)}><Shield size={14} className="text-primary" /></Button>
                     </div>
                   </td>
                 </motion.tr>
@@ -312,6 +328,27 @@ export default function StudentManagement() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {shareTarget && (() => {
+        const { phone, message, data } = buildStudentSummary(shareTarget);
+        return (
+          <WhatsAppConfirmDialog
+            open={!!shareTarget}
+            onClose={() => setShareTarget(null)}
+            title={`Share ${shareTarget.name}`}
+            subtitle="Review the encoded message before sending on WhatsApp"
+            phoneNumber={phone}
+            message={message}
+            details={[
+              { label: 'Student', value: `${shareTarget.name} (${shareTarget.studentId})` },
+              { label: 'Course', value: shareTarget.course },
+              { label: 'Paid', value: `₹${data.paid.toLocaleString()}` },
+              { label: 'Pending', value: `₹${data.pending.toLocaleString()}` },
+              { label: 'Late Fee', value: `₹${data.lateFee.toLocaleString()}` },
+            ]}
+          />
+        );
+      })()}
     </div>
   );
 }

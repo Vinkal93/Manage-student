@@ -8,6 +8,9 @@ import { Calendar as CalIcon, Bell, ChevronLeft, ChevronRight, Send } from 'luci
 import { toast } from 'sonner';
 import { openWhatsApp } from '@/lib/whatsapp';
 import { getSettings } from '@/lib/settings';
+import { logAudit } from '@/lib/audit';
+import { getCurrentUser } from '@/lib/auth';
+import { AlertTriangle } from 'lucide-react';
 
 export default function FeeCalendar() {
   const settings = getSettings();
@@ -16,6 +19,8 @@ export default function FeeCalendar() {
   const [year, setYear] = useState(today.getFullYear());
   const [selectedDate, setSelectedDate] = useState<string>(today.toISOString().split('T')[0]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [multiDates, setMultiDates] = useState<Set<string>>(new Set());
+  const [multiMode, setMultiMode] = useState(false);
 
   const students = useMemo(() => getStudents(), []);
 
@@ -51,6 +56,31 @@ export default function FeeCalendar() {
     setMonth(d.getMonth()); setYear(d.getFullYear());
   };
 
+  const toggleDate = (dateStr: string) => {
+    if (multiMode) {
+      setMultiDates(prev => { const n = new Set(prev); n.has(dateStr) ? n.delete(dateStr) : n.add(dateStr); return n; });
+    } else {
+      setSelectedDate(dateStr); setSelected(new Set());
+    }
+  };
+
+  const sendMultiDateReminders = () => {
+    if (multiDates.size === 0) { toast.error('Select at least one date'); return; }
+    let count = 0;
+    let delay = 0;
+    multiDates.forEach(dateStr => {
+      const list = dueByDate.get(dateStr) || [];
+      list.forEach(it => {
+        const msg = `🔔 *Fee Reminder*\n\nप्रिय ${it.name},\n${settings.instituteName} में आपकी फीस ₹${it.amount.toLocaleString()} ${new Date(dateStr).toLocaleDateString('en-IN')} को due थी।\nकृपया जल्द से जल्द जमा करें।\n\nधन्यवाद 🙏`;
+        setTimeout(() => openWhatsApp(it.whatsapp, msg), delay);
+        delay += 600; count++;
+      });
+    });
+    if (count === 0) { toast.error('Selected dates have no pending fees'); return; }
+    toast.success(`Triggering ${count} WhatsApp reminder(s) across ${multiDates.size} date(s)…`);
+    setMultiDates(new Set());
+  };
+
   const toggle = (id: string) => {
     setSelected(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
   };
@@ -58,11 +88,26 @@ export default function FeeCalendar() {
   const sendReminders = () => {
     const items = dueOnDate.filter(d => selected.has(d.feeId));
     if (items.length === 0) { toast.error('Select at least one student'); return; }
+    const actor = getCurrentUser()?.email || getCurrentUser()?.name || 'admin';
     items.forEach((it, idx) => {
       const msg = `🔔 *Fee Reminder*\n\nप्रिय ${it.name},\n${settings.instituteName} में आपकी फीस ₹${it.amount.toLocaleString()} ${new Date(selectedDate).toLocaleDateString('en-IN')} को due थी।\nकृपया जल्द से जल्द जमा करें।\n\nधन्यवाद 🙏`;
       setTimeout(() => openWhatsApp(it.whatsapp, msg), idx * 600);
+      logAudit({ actor, action: 'fee.reminder_sent', targetId: it.studentId, targetLabel: it.name, details: `Reminder ₹${it.amount} due ${selectedDate}` });
     });
     toast.success(`Opening WhatsApp for ${items.length} reminder(s)…`);
+    setSelected(new Set());
+  };
+
+  const sendFinalWarnings = () => {
+    const items = dueOnDate.filter(d => selected.has(d.feeId));
+    if (items.length === 0) { toast.error('Select at least one student'); return; }
+    const actor = getCurrentUser()?.email || getCurrentUser()?.name || 'admin';
+    items.forEach((it, idx) => {
+      const msg = `⚠️ *FINAL WARNING — Fee Overdue*\n\nप्रिय ${it.name},\n${settings.instituteName} में आपकी फीस ₹${it.amount.toLocaleString()} (due ${new Date(selectedDate).toLocaleDateString('en-IN')}) अभी तक pending है।\n\nयह *अंतिम सूचना* है। यदि 48 घंटे में भुगतान नहीं हुआ तो आपका enrollment suspend किया जा सकता है और late fee बढ़ाई जाएगी।\n\nकृपया तुरंत संपर्क करें।\n— ${settings.instituteName}`;
+      setTimeout(() => openWhatsApp(it.whatsapp, msg), idx * 600);
+      logAudit({ actor, action: 'fee.final_warning', targetId: it.studentId, targetLabel: it.name, details: `Final warning ₹${it.amount} due ${selectedDate}` });
+    });
+    toast.success(`Sending FINAL WARNING to ${items.length} student(s)…`);
     setSelected(new Set());
   };
 
@@ -71,6 +116,20 @@ export default function FeeCalendar() {
       <div>
         <h1 className="text-2xl font-bold text-foreground flex items-center gap-2"><CalIcon size={22} /> Fee Due Calendar</h1>
         <p className="text-muted-foreground text-sm mt-1">Daily pending fees aur manual reminder trigger</p>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2 bg-card border border-border rounded-xl p-3">
+        <Button size="sm" variant={multiMode ? 'default' : 'outline'} onClick={() => { setMultiMode(m => !m); setMultiDates(new Set()); }} className="gap-1.5">
+          <CalIcon size={14} /> {multiMode ? 'Exit Multi-Select' : 'Select Multiple Dates'}
+        </Button>
+        {multiMode && (
+          <>
+            <Badge variant="secondary">{multiDates.size} date(s) selected</Badge>
+            <Button size="sm" className="gap-1.5" disabled={multiDates.size === 0} onClick={sendMultiDateReminders}>
+              <Send size={14} /> Trigger Reminders Now
+            </Button>
+          </>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -89,10 +148,10 @@ export default function FeeCalendar() {
               if (d === null) return <div key={i} />;
               const dateStr = getDateStr(d);
               const due = dueByDate.get(dateStr) || [];
-              const isSelected = selectedDate === dateStr;
+              const isSelected = multiMode ? multiDates.has(dateStr) : selectedDate === dateStr;
               const totalAmt = due.reduce((a, b) => a + b.amount, 0);
               return (
-                <button key={i} onClick={() => { setSelectedDate(dateStr); setSelected(new Set()); }}
+                <button key={i} onClick={() => toggleDate(dateStr)}
                   className={`aspect-square rounded-lg text-xs flex flex-col items-center justify-center transition-all border ${
                     isSelected ? 'bg-primary text-primary-foreground border-primary' :
                     due.length > 0 ? 'bg-destructive/10 border-destructive/30 text-foreground hover:bg-destructive/20' :
@@ -117,9 +176,14 @@ export default function FeeCalendar() {
               <h3 className="font-semibold text-foreground">{new Date(selectedDate).toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}</h3>
               <p className="text-xs text-muted-foreground">{dueOnDate.length} pending fee(s) • Total ₹{dueOnDate.reduce((a,b) => a+b.amount, 0).toLocaleString()}</p>
             </div>
-            <Button size="sm" className="gap-1.5" disabled={selected.size === 0} onClick={sendReminders}>
-              <Send size={14} /> Send ({selected.size})
-            </Button>
+            <div className="flex flex-wrap gap-2 justify-end">
+              <Button size="sm" className="gap-1.5" disabled={selected.size === 0} onClick={sendReminders}>
+                <Send size={14} /> Reminder ({selected.size})
+              </Button>
+              <Button size="sm" variant="destructive" className="gap-1.5" disabled={selected.size === 0} onClick={sendFinalWarnings}>
+                <AlertTriangle size={14} /> Final Warning
+              </Button>
+            </div>
           </div>
           <div className="space-y-2 max-h-[420px] overflow-y-auto">
             {dueOnDate.length === 0 ? (

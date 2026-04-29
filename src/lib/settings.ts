@@ -18,6 +18,7 @@ export interface InstituteSettings {
     senderId: string;
     serverKey?: string;
     enabled: boolean;
+    subscribers?: { token: string; userId: string; name?: string; subscribedAt: string }[];
   };
   // Knowledge Panel — institute info for chatbot
   knowledgeBase: KnowledgeEntry[];

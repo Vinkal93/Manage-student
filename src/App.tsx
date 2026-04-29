@@ -95,6 +95,7 @@ import StudentAssignments from "@/pages/StudentAssignments";
 import StudentPayment from "@/pages/StudentPayment";
 import FeatureToggles from "@/pages/FeatureToggles";
 import SidebarConfig from "@/pages/SidebarConfig";
+import Subscription from "@/pages/Subscription";
 import NotFound from "./pages/NotFound";
 import AIChatbot from "@/components/AIChatbot";
 import Footer from "@/components/Footer";
@@ -196,6 +197,7 @@ const App = () => (
           <Route path="/admin/fee-calendar" element={<ProtectedRoute role="admin"><AdminLayout><FeeCalendar /></AdminLayout></ProtectedRoute>} />
           <Route path="/admin/features" element={<ProtectedRoute role="admin"><AdminLayout><FeatureToggles /></AdminLayout></ProtectedRoute>} />
           <Route path="/admin/sidebar-config" element={<ProtectedRoute role="admin"><AdminLayout><SidebarConfig /></AdminLayout></ProtectedRoute>} />
+          <Route path="/admin/subscription" element={<ProtectedRoute role="admin"><AdminLayout><Subscription /></AdminLayout></ProtectedRoute>} />
           <Route path="/admin/student/:id" element={<ProtectedRoute role="admin"><AdminLayout><StudentProfile /></AdminLayout></ProtectedRoute>} />
 
           {/* Student Routes */}

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getDbConfig, saveDbConfig, testDbConnection, DB_LABELS, DB_FIELDS, type DatabaseConfig, type DatabaseType } from '@/lib/dbConnectors';
 import { getSheetsConfig, saveSheetsConfig, type SheetsConfig } from '@/lib/sheets';
+import { getStudents } from '@/lib/store';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
@@ -139,8 +140,8 @@ export default function DatabaseSettings() {
       a.click(); URL.revokeObjectURL(url);
       toast.success('JSON exported!');
     } else if (format === 'CSV') {
-      // Export students as CSV
-      const students = JSON.parse(localStorage.getItem('sbci_students') || '[]');
+      // Export students as CSV (tenant-scoped)
+      const students = getStudents();
       if (students.length === 0) { toast.info('No student data to export'); return; }
       const headers = ['Student ID', 'Name', 'Father Name', 'Mobile', 'Course', 'Admission Date', 'Status'];
       const rows = students.map((s: any) => [s.studentId, s.name, s.fatherName, s.mobile, s.course, s.admissionDate, s.status].join(','));
