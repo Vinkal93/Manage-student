@@ -19,6 +19,8 @@ import {
   type Institute, type PlanType,
 } from '@/lib/tenant';
 import { getStudents } from '@/lib/store';
+import { getAuditLog, logAudit } from '@/lib/audit';
+import { ScrollText, ClipboardCheck } from 'lucide-react';
 
 const SU_PASS = 'superadmin2026';
 
@@ -35,6 +37,8 @@ export default function SuperAdmin() {
 
   const institutes = useMemo(() => getInstitutes(), [refreshKey]);
   const sessions = useMemo(() => JSON.parse(localStorage.getItem('sbci_sessions') || '[]'), [refreshKey]);
+  const auditLog = useMemo(() => getAuditLog().slice().reverse(), [refreshKey]);
+  const [approvalPlan, setApprovalPlan] = useState<Record<string, PlanType>>({});
 
   // Aggregate per-institute analytics (tenant-scoped reads)
   const tenantData = useMemo(() => institutes.map(inst => {
@@ -81,12 +85,15 @@ export default function SuperAdmin() {
 
   const doApprove = (id: string, plan: PlanType = 'free') => {
     const r = approveInstitute(id, plan);
-    if (r) { setCredsInstitute(r); toast.success('Institute approved! Share credentials with the owner.'); refresh(); }
+    if (r) {
+      setCredsInstitute(r); toast.success('Institute approved! Share credentials with the owner.'); refresh();
+      logAudit({ actor: 'super-admin', action: 'institute.approve', targetId: id, targetLabel: r.instituteName, details: `Approved on plan ${PLANS[plan].name}` });
+    }
   };
-  const doReject = (id: string) => { updateInstitute(id, { status: 'rejected', rejectedAt: new Date().toISOString() }); toast.success('Institute rejected'); refresh(); };
-  const doSuspend = (id: string) => { updateInstitute(id, { status: 'suspended', suspendedAt: new Date().toISOString() }); toast.success('Institute suspended'); refresh(); };
-  const doReactivate = (id: string) => { updateInstitute(id, { status: 'approved' }); toast.success('Institute reactivated'); refresh(); };
-  const doChangePlan = (id: string, plan: PlanType) => { updateInstitute(id, { plan, monthlyFee: PLANS[plan].price }); toast.success(`Plan changed to ${PLANS[plan].name}`); refresh(); };
+  const doReject = (id: string) => { const r = updateInstitute(id, { status: 'rejected', rejectedAt: new Date().toISOString() }); toast.success('Institute rejected'); refresh(); logAudit({ actor: 'super-admin', action: 'institute.reject', targetId: id, targetLabel: r?.instituteName }); };
+  const doSuspend = (id: string) => { const r = updateInstitute(id, { status: 'suspended', suspendedAt: new Date().toISOString() }); toast.success('Institute suspended'); refresh(); logAudit({ actor: 'super-admin', action: 'institute.suspend', targetId: id, targetLabel: r?.instituteName }); };
+  const doReactivate = (id: string) => { const r = updateInstitute(id, { status: 'approved' }); toast.success('Institute reactivated'); refresh(); logAudit({ actor: 'super-admin', action: 'institute.reactivate', targetId: id, targetLabel: r?.instituteName }); };
+  const doChangePlan = (id: string, plan: PlanType) => { const r = updateInstitute(id, { plan, monthlyFee: PLANS[plan].price }); toast.success(`Plan changed to ${PLANS[plan].name}`); refresh(); logAudit({ actor: 'super-admin', action: 'institute.plan_change', targetId: id, targetLabel: r?.instituteName, details: `New plan: ${PLANS[plan].name}` }); };
 
   if (!authenticated) {
     return (
@@ -152,10 +159,12 @@ export default function SuperAdmin() {
         </div>
 
         <Tabs value={tab} onValueChange={setTab}>
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="dashboard" className="gap-1 text-xs"><BarChart3 size={14} /> Overview</TabsTrigger>
+            <TabsTrigger value="approvals" className="gap-1 text-xs"><ClipboardCheck size={14} /> Approvals</TabsTrigger>
             <TabsTrigger value="institutes" className="gap-1 text-xs"><Building2 size={14} /> Institutes</TabsTrigger>
             <TabsTrigger value="revenue" className="gap-1 text-xs"><IndianRupee size={14} /> Revenue</TabsTrigger>
+            <TabsTrigger value="audit" className="gap-1 text-xs"><ScrollText size={14} /> Audit Log</TabsTrigger>
             <TabsTrigger value="control" className="gap-1 text-xs"><Settings size={14} /> Control</TabsTrigger>
           </TabsList>
 
@@ -201,6 +210,84 @@ export default function SuperAdmin() {
                     </div>
                   </div>
                 ))}
+              </div>
+            </div>
+          </TabsContent>
+
+          {/* Approvals tab */}
+          <TabsContent value="approvals" className="space-y-4">
+            <div className="bg-card rounded-xl border border-border shadow-sm">
+              <div className="p-4 border-b border-border flex items-center justify-between">
+                <h3 className="font-semibold text-foreground flex items-center gap-2"><ClipboardCheck size={16} className="text-warning" /> Pending Institute Registrations ({pending.length})</h3>
+                <Badge variant="outline">Approve with plan selection</Badge>
+              </div>
+              <div className="divide-y divide-border">
+                {pending.length === 0 ? (
+                  <div className="p-8 text-center text-muted-foreground text-sm">No pending registrations 🎉</div>
+                ) : pending.map(r => (
+                  <div key={r.id} className="p-4 grid grid-cols-1 md:grid-cols-12 gap-3 items-start">
+                    <div className="md:col-span-5">
+                      <p className="font-medium text-foreground">{r.instituteName}</p>
+                      <p className="text-xs text-muted-foreground">{r.ownerName} • {r.email}</p>
+                      <p className="text-xs text-muted-foreground">{r.phone} • {r.city}, {r.state}</p>
+                      <p className="text-xs text-muted-foreground mt-1">Type: {r.instituteType} • Students: {r.numberOfStudents}</p>
+                    </div>
+                    <div className="md:col-span-3">
+                      <p className="text-[11px] text-muted-foreground mb-1">Courses</p>
+                      <p className="text-xs text-foreground line-clamp-2">{r.coursesOffered || '—'}</p>
+                      <p className="text-[11px] text-muted-foreground mt-2">Applied {new Date(r.submittedAt).toLocaleDateString('en-IN')}</p>
+                    </div>
+                    <div className="md:col-span-2">
+                      <p className="text-[11px] text-muted-foreground mb-1">Assign Plan</p>
+                      <Select value={approvalPlan[r.id] || 'free'} onValueChange={v => setApprovalPlan(p => ({ ...p, [r.id]: v as PlanType }))}>
+                        <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {(Object.keys(PLANS) as PlanType[]).map(p => <SelectItem key={p} value={p} className="text-xs">{PLANS[p].name} • ₹{PLANS[p].price}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="md:col-span-2 flex gap-2 md:justify-end">
+                      <Button size="sm" className="gap-1 bg-success hover:bg-success/90" onClick={() => doApprove(r.id, approvalPlan[r.id] || 'free')}><CheckCircle size={14} /> Approve</Button>
+                      <Button size="sm" variant="destructive" className="gap-1" onClick={() => doReject(r.id)}><XCircle size={14} /></Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </TabsContent>
+
+          {/* Audit log tab */}
+          <TabsContent value="audit" className="space-y-4">
+            <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
+              <div className="p-4 border-b border-border flex items-center justify-between">
+                <h3 className="font-semibold text-foreground flex items-center gap-2"><ScrollText size={16} /> Audit Log ({auditLog.length})</h3>
+                <Badge variant="outline">Tracks suspends, plan changes, fee edits & overrides</Badge>
+              </div>
+              <div className="overflow-x-auto max-h-[600px]">
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0 bg-muted/50">
+                    <tr className="border-b border-border">
+                      <th className="text-left p-3 text-xs text-muted-foreground">Time</th>
+                      <th className="text-left p-3 text-xs text-muted-foreground">Actor</th>
+                      <th className="text-left p-3 text-xs text-muted-foreground">Action</th>
+                      <th className="text-left p-3 text-xs text-muted-foreground">Target</th>
+                      <th className="text-left p-3 text-xs text-muted-foreground">Details</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {auditLog.length === 0 ? (
+                      <tr><td colSpan={5} className="p-8 text-center text-muted-foreground text-sm">No audit entries yet</td></tr>
+                    ) : auditLog.map(e => (
+                      <tr key={e.id} className="border-b border-border last:border-0 hover:bg-muted/30">
+                        <td className="p-3 text-xs text-muted-foreground whitespace-nowrap">{new Date(e.ts).toLocaleString('en-IN')}</td>
+                        <td className="p-3 text-xs"><Badge variant={e.actor === 'super-admin' ? 'destructive' : 'secondary'} className="text-[10px]">{e.actor}</Badge></td>
+                        <td className="p-3 text-xs font-mono text-foreground">{e.action}</td>
+                        <td className="p-3 text-xs text-foreground">{e.targetLabel || e.targetId || '—'}</td>
+                        <td className="p-3 text-xs text-muted-foreground">{e.details || '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
           </TabsContent>
@@ -355,7 +442,7 @@ export default function SuperAdmin() {
                         <p className="font-medium text-foreground">{i.instituteName}</p>
                         <p className="text-xs text-muted-foreground">Expires {new Date(i.expiresAt!).toLocaleDateString('en-IN')}</p>
                       </div>
-                      <Button size="sm" variant="outline" onClick={() => { updateInstitute(i.id, { expiresAt: new Date(Date.now() + 30 * 86400000).toISOString() }); refresh(); toast.success('Renewed +30 days'); }}>Renew</Button>
+                      <Button size="sm" variant="outline" onClick={() => { updateInstitute(i.id, { expiresAt: new Date(Date.now() + 30 * 86400000).toISOString() }); logAudit({ actor: 'super-admin', action: 'fee.manual_edit', targetId: i.id, targetLabel: i.instituteName, details: 'Renewed +30 days' }); refresh(); toast.success('Renewed +30 days'); }}>Renew</Button>
                     </div>
                   ))}
                   {institutes.filter(i => i.expiresAt && new Date(i.expiresAt).getTime() - Date.now() < 7 * 86400000 && i.status === 'approved').length === 0 && (
@@ -444,7 +531,7 @@ export default function SuperAdmin() {
                   <Button size="sm" variant="outline" onClick={() => { navigator.clipboard.writeText(`Email: ${credsInstitute.email}\nPassword: ${credsInstitute.adminPassword}`); toast.success('Copied'); }}>Copy</Button>
                 </div>
               </div>
-              <Button size="sm" variant="outline" className="w-full" onClick={() => { const np = Math.random().toString(36).slice(2, 10); updateInstitute(credsInstitute.id, { adminPassword: np }); setCredsInstitute({ ...credsInstitute, adminPassword: np }); refresh(); toast.success('Password reset'); }}>Reset Password</Button>
+              <Button size="sm" variant="outline" className="w-full" onClick={() => { const np = Math.random().toString(36).slice(2, 10); updateInstitute(credsInstitute.id, { adminPassword: np }); logAudit({ actor: 'super-admin', action: 'institute.password_reset', targetId: credsInstitute.id, targetLabel: credsInstitute.instituteName }); setCredsInstitute({ ...credsInstitute, adminPassword: np }); refresh(); toast.success('Password reset'); }}>Reset Password</Button>
             </div>
           )}
         </DialogContent>

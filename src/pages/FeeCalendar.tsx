@@ -8,6 +8,9 @@ import { Calendar as CalIcon, Bell, ChevronLeft, ChevronRight, Send } from 'luci
 import { toast } from 'sonner';
 import { openWhatsApp } from '@/lib/whatsapp';
 import { getSettings } from '@/lib/settings';
+import { logAudit } from '@/lib/audit';
+import { getCurrentUser } from '@/lib/auth';
+import { AlertTriangle } from 'lucide-react';
 
 export default function FeeCalendar() {
   const settings = getSettings();
@@ -85,11 +88,26 @@ export default function FeeCalendar() {
   const sendReminders = () => {
     const items = dueOnDate.filter(d => selected.has(d.feeId));
     if (items.length === 0) { toast.error('Select at least one student'); return; }
+    const actor = getCurrentUser()?.email || getCurrentUser()?.name || 'admin';
     items.forEach((it, idx) => {
       const msg = `🔔 *Fee Reminder*\n\nप्रिय ${it.name},\n${settings.instituteName} में आपकी फीस ₹${it.amount.toLocaleString()} ${new Date(selectedDate).toLocaleDateString('en-IN')} को due थी।\nकृपया जल्द से जल्द जमा करें।\n\nधन्यवाद 🙏`;
       setTimeout(() => openWhatsApp(it.whatsapp, msg), idx * 600);
+      logAudit({ actor, action: 'fee.reminder_sent', targetId: it.studentId, targetLabel: it.name, details: `Reminder ₹${it.amount} due ${selectedDate}` });
     });
     toast.success(`Opening WhatsApp for ${items.length} reminder(s)…`);
+    setSelected(new Set());
+  };
+
+  const sendFinalWarnings = () => {
+    const items = dueOnDate.filter(d => selected.has(d.feeId));
+    if (items.length === 0) { toast.error('Select at least one student'); return; }
+    const actor = getCurrentUser()?.email || getCurrentUser()?.name || 'admin';
+    items.forEach((it, idx) => {
+      const msg = `⚠️ *FINAL WARNING — Fee Overdue*\n\nप्रिय ${it.name},\n${settings.instituteName} में आपकी फीस ₹${it.amount.toLocaleString()} (due ${new Date(selectedDate).toLocaleDateString('en-IN')}) अभी तक pending है।\n\nयह *अंतिम सूचना* है। यदि 48 घंटे में भुगतान नहीं हुआ तो आपका enrollment suspend किया जा सकता है और late fee बढ़ाई जाएगी।\n\nकृपया तुरंत संपर्क करें।\n— ${settings.instituteName}`;
+      setTimeout(() => openWhatsApp(it.whatsapp, msg), idx * 600);
+      logAudit({ actor, action: 'fee.final_warning', targetId: it.studentId, targetLabel: it.name, details: `Final warning ₹${it.amount} due ${selectedDate}` });
+    });
+    toast.success(`Sending FINAL WARNING to ${items.length} student(s)…`);
     setSelected(new Set());
   };
 
@@ -158,9 +176,14 @@ export default function FeeCalendar() {
               <h3 className="font-semibold text-foreground">{new Date(selectedDate).toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}</h3>
               <p className="text-xs text-muted-foreground">{dueOnDate.length} pending fee(s) • Total ₹{dueOnDate.reduce((a,b) => a+b.amount, 0).toLocaleString()}</p>
             </div>
-            <Button size="sm" className="gap-1.5" disabled={selected.size === 0} onClick={sendReminders}>
-              <Send size={14} /> Send ({selected.size})
-            </Button>
+            <div className="flex flex-wrap gap-2 justify-end">
+              <Button size="sm" className="gap-1.5" disabled={selected.size === 0} onClick={sendReminders}>
+                <Send size={14} /> Reminder ({selected.size})
+              </Button>
+              <Button size="sm" variant="destructive" className="gap-1.5" disabled={selected.size === 0} onClick={sendFinalWarnings}>
+                <AlertTriangle size={14} /> Final Warning
+              </Button>
+            </div>
           </div>
           <div className="space-y-2 max-h-[420px] overflow-y-auto">
             {dueOnDate.length === 0 ? (

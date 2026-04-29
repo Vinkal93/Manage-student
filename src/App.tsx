@@ -43,6 +43,7 @@ import StudentTimetable from "@/pages/StudentTimetable";
 import StudentAssignments from "@/pages/StudentAssignments";
 import StudentPayment from "@/pages/StudentPayment";
 import FeatureToggles from "@/pages/FeatureToggles";
+import Subscription from "@/pages/Subscription";
 import NotFound from "./pages/NotFound";
 import AIChatbot from "@/components/AIChatbot";
 import Footer from "@/components/Footer";
@@ -142,6 +143,7 @@ const App = () => (
           <Route path="/admin/fee-record" element={<ProtectedRoute role="admin"><AdminLayout><FeeRecord /></AdminLayout></ProtectedRoute>} />
           <Route path="/admin/fee-calendar" element={<ProtectedRoute role="admin"><AdminLayout><FeeCalendar /></AdminLayout></ProtectedRoute>} />
           <Route path="/admin/features" element={<ProtectedRoute role="admin"><AdminLayout><FeatureToggles /></AdminLayout></ProtectedRoute>} />
+          <Route path="/admin/subscription" element={<ProtectedRoute role="admin"><AdminLayout><Subscription /></AdminLayout></ProtectedRoute>} />
           <Route path="/admin/student/:id" element={<ProtectedRoute role="admin"><AdminLayout><StudentProfile /></AdminLayout></ProtectedRoute>} />
 
           {/* Student Routes */}
