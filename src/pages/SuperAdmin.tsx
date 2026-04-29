@@ -442,7 +442,7 @@ export default function SuperAdmin() {
                         <p className="font-medium text-foreground">{i.instituteName}</p>
                         <p className="text-xs text-muted-foreground">Expires {new Date(i.expiresAt!).toLocaleDateString('en-IN')}</p>
                       </div>
-                      <Button size="sm" variant="outline" onClick={() => { updateInstitute(i.id, { expiresAt: new Date(Date.now() + 30 * 86400000).toISOString() }); refresh(); toast.success('Renewed +30 days'); }}>Renew</Button>
+                      <Button size="sm" variant="outline" onClick={() => { updateInstitute(i.id, { expiresAt: new Date(Date.now() + 30 * 86400000).toISOString() }); logAudit({ actor: 'super-admin', action: 'fee.manual_edit', targetId: i.id, targetLabel: i.instituteName, details: 'Renewed +30 days' }); refresh(); toast.success('Renewed +30 days'); }}>Renew</Button>
                     </div>
                   ))}
                   {institutes.filter(i => i.expiresAt && new Date(i.expiresAt).getTime() - Date.now() < 7 * 86400000 && i.status === 'approved').length === 0 && (
@@ -531,7 +531,7 @@ export default function SuperAdmin() {
                   <Button size="sm" variant="outline" onClick={() => { navigator.clipboard.writeText(`Email: ${credsInstitute.email}\nPassword: ${credsInstitute.adminPassword}`); toast.success('Copied'); }}>Copy</Button>
                 </div>
               </div>
-              <Button size="sm" variant="outline" className="w-full" onClick={() => { const np = Math.random().toString(36).slice(2, 10); updateInstitute(credsInstitute.id, { adminPassword: np }); setCredsInstitute({ ...credsInstitute, adminPassword: np }); refresh(); toast.success('Password reset'); }}>Reset Password</Button>
+              <Button size="sm" variant="outline" className="w-full" onClick={() => { const np = Math.random().toString(36).slice(2, 10); updateInstitute(credsInstitute.id, { adminPassword: np }); logAudit({ actor: 'super-admin', action: 'institute.password_reset', targetId: credsInstitute.id, targetLabel: credsInstitute.instituteName }); setCredsInstitute({ ...credsInstitute, adminPassword: np }); refresh(); toast.success('Password reset'); }}>Reset Password</Button>
             </div>
           )}
         </DialogContent>
