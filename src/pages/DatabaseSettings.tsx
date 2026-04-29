@@ -140,7 +140,8 @@ export default function DatabaseSettings() {
       toast.success('JSON exported!');
     } else if (format === 'CSV') {
       // Export students as CSV
-      const students = JSON.parse(localStorage.getItem('sbci_students') || '[]');
+      const { getStudents } = await import('@/lib/store');
+      const students = getStudents();
       if (students.length === 0) { toast.info('No student data to export'); return; }
       const headers = ['Student ID', 'Name', 'Father Name', 'Mobile', 'Course', 'Admission Date', 'Status'];
       const rows = students.map((s: any) => [s.studentId, s.name, s.fatherName, s.mobile, s.course, s.admissionDate, s.status].join(','));
