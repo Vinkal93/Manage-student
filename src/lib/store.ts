@@ -47,7 +47,24 @@ export interface MessageRecord {
   status: 'sent' | 'pending' | 'failed';
 }
 
-const STORAGE_KEY = 'sbci_students';
+import { tenantKey, getCurrentInstituteId, getInstitutes } from './tenant';
+
+const BASE_KEY = 'sbci_students';
+function STORAGE_KEY(instituteId?: string | null) {
+  return tenantKey(BASE_KEY, instituteId);
+}
+
+// One-time migration: move legacy un-scoped students into the demo institute bucket.
+(function migrateLegacy() {
+  try {
+    const legacy = localStorage.getItem(BASE_KEY);
+    const target = STORAGE_KEY('demo-institute');
+    if (legacy && !localStorage.getItem(target)) {
+      localStorage.setItem(target, legacy);
+    }
+  } catch {}
+})();
+
 let lastStudentNumber = 0;
 
 function getNextStudentId(): string {
@@ -61,12 +78,23 @@ function getNextStudentId(): string {
   return 'SBCI' + String(lastStudentNumber).padStart(4, '0');
 }
 
-export function getStudents(): Student[] {
-  const data = localStorage.getItem(STORAGE_KEY);
+export function getStudents(instituteId?: string | null): Student[] {
+  const key = STORAGE_KEY(instituteId);
+  const data = localStorage.getItem(key);
   if (data) return JSON.parse(data);
-  const sample = getSampleStudents();
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(sample));
-  return sample;
+  // seed only for the demo institute
+  if ((instituteId || getCurrentInstituteId()) === 'demo-institute') {
+    const sample = getSampleStudents();
+    localStorage.setItem(key, JSON.stringify(sample));
+    return sample;
+  }
+  localStorage.setItem(key, JSON.stringify([]));
+  return [];
+}
+
+/** Cross-tenant aggregate — Super Admin only. */
+export function getAllStudentsAcrossTenants(): { instituteId: string; students: Student[] }[] {
+  return getInstitutes().map(i => ({ instituteId: i.id, students: getStudents(i.id) }));
 }
 
 export function getStudentById(id: string): Student | undefined {
@@ -77,8 +105,8 @@ export function getStudentByStudentId(studentId: string): Student | undefined {
   return getStudents().find(s => s.studentId === studentId);
 }
 
-export function saveStudents(students: Student[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(students));
+export function saveStudents(students: Student[], instituteId?: string | null) {
+  localStorage.setItem(STORAGE_KEY(instituteId), JSON.stringify(students));
 }
 
 export function addStudent(data: { name: string; fatherName: string; mobile: string; course: string; admissionDate: string; feeAmount: number; whatsappNumber?: string }): Student {
